@@ -4,12 +4,15 @@ Web-Anwendung für Handy und iPad: Baumaschinen mit vorhandenen 1D-Strichcode-Et
 scannen, ausgeben, zurücknehmen — mit lückenloser Historie, wer ein Gerät wann auf
 welche Baustelle gebracht hat.
 
-**Stand: 2026-08-19 — AP1 bis AP10 fertig.** Anmelden, scannen, ausgeben,
+**Stand: 2026-08-19 — AP1 bis AP11 fertig, als Docker-Paket lauffähig.** Anmelden, scannen, ausgeben,
 zurücknehmen, umbuchen; Fotos und Dokumente; Prüfungen; Schäden; Zubehör;
 Geräte anlegen und bearbeiten, Import/Export als Tabelle, Etikettendruck;
 **Benutzerverwaltung in der Oberfläche mit frei zusammenstellbaren Rollen.**
+**Läuft als zwei Docker-Container auf dem Mini-PC** — Aufsetzen, Sicherung und
+Fehlersuche: [`docs/BETRIEB.md`](docs/BETRIEB.md).
 Vollständiger Plan: [`docs/PLAN.md`](docs/PLAN.md),
 Bedienung der Benutzerverwaltung: [`docs/BEDIENUNG.md`](docs/BEDIENUNG.md).
+**Seit 2026-08-19 unter Git** (vorher gab es keine Versionskontrolle).
 
 ## Loslegen
 
@@ -162,7 +165,8 @@ komplett geladen und im Browser gefiltert.
 
 Node 24 · TypeScript ESM strict · **Hono 4** · **PostgreSQL 16** über **postgres.js**
 (kein ORM) · Vue 3.5 + Vite + Pinia + Tailwind v4 · Vitest · Docker Compose
-(postgres + app + caddy + cloudflared).
+(app + postgres, cloudflared als optionales Profil — kein Caddy nötig, die
+Anwendung liefert Oberfläche und API selbst aus).
 
 Geerbt von `../patio` — gleiche Konventionen, damit nichts Neues zu lernen ist.
 Drei bewusste Abweichungen: JWT im **httpOnly-Cookie** statt localStorage ·
