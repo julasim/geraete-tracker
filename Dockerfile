@@ -22,6 +22,9 @@ RUN npm ci --ignore-scripts && npm --prefix web ci
 COPY tsconfig.json ./
 COPY src ./src
 COPY web ./web
+# Der Bau ruft scripts/kopiere-migrationen.mjs — ohne diese Zeile bricht er
+# mit "Cannot find module" ab.
+COPY scripts ./scripts
 
 RUN npm run build
 
@@ -45,6 +48,11 @@ WORKDIR /app
 COPY --from=bau --chown=node:node /bau/node_modules ./node_modules
 COPY --from=bau --chown=node:node /bau/dist ./dist
 COPY --from=bau --chown=node:node /bau/package.json ./package.json
+
+# Die Durchläufe kommen mit ins Laufzeit-Abbild (zusammen ~40 KB). Damit lässt
+# sich die Anlage nach dem Aufsetzen VOR ORT prüfen:
+#   docker compose exec app node scripts/rauchtest.mjs <name> <passwort>
+COPY --from=bau --chown=node:node /bau/scripts ./scripts
 
 # Fotos und Anhänge. Der Ordner gehört node (uid 1000) — liegt hier ein
 # Verzeichnis vom Host darüber, das root gehört, scheitert das Hochladen mit
