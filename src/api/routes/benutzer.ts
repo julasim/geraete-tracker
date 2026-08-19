@@ -1,0 +1,156 @@
+/**
+ * Benutzer und Rollen verwalten.
+ *
+ * Die Sperren gegen das eigene Aussperren sitzen bewusst NICHT hier, sondern
+ * in `src/data/benutzer.ts` — sie sollen auch dann greifen, wenn jemand
+ * später einen zweiten Weg zu denselben Daten baut.
+ */
+
+import { Hono } from "hono";
+import { z } from "zod";
+import { angemeldet, darf, hatRechtImKontext, type AppEnv } from "../auth.js";
+import { pfadId } from "../pfad.js";
+import { EingabeFehler } from "../fehler.js";
+import {
+  aendereBenutzer,
+  legeBenutzerAn,
+  listeBenutzerKurz,
+  listeBenutzerVoll,
+  setzePasswortZurueck,
+} from "../../data/benutzer.js";
+import {
+  aendereRolle,
+  legeRolleAn,
+  listeRollen,
+  loescheRolle,
+} from "../../data/rollen.js";
+import { RECHT_TEXT, rechteNachGruppe, RECHTE } from "../../domain/rechte.js";
+import { logInfo } from "../../logger.js";
+
+export const benutzerRouten = new Hono<AppEnv>();
+
+async function gelesen<T>(
+  c: { req: { json(): Promise<unknown> } },
+  schema: z.ZodType<T>,
+): Promise<T> {
+  const roh = await c.req.json().catch(() => null);
+  const ergebnis = schema.safeParse(roh);
+  if (!ergebnis.success) {
+    const felder: Record<string, string> = {};
+    for (const problem of ergebnis.error.issues) {
+      felder[problem.path.join(".") || "_"] = problem.message;
+    }
+    throw new EingabeFehler("Die Eingabe ist unvollständig oder fehlerhaft.", felder);
+  }
+  return ergebnis.data;
+}
+
+/**
+ * Die Benutzerliste — in zwei Ausprägungen.
+ *
+ * Beim Ausgeben eines Geräts braucht JEDER die Namensliste, sonst lässt sich
+ * nichts auf jemanden buchen. Ohne das Recht `benutzer.verwalten` liefert die
+ * Route deshalb nur Kennung, Name und Zustand — nicht E-Mail, Rolle oder
+ * Anmeldeverhalten.
+ *
+ * (Diese Route fehlte bis AP10 vollständig, während BuchenView sie bereits
+ * aufrief — das Ausgeben lief dort in einen 404.)
+ */
+benutzerRouten.get("/benutzer", async (c) => {
+  if (hatRechtImKontext(c, "benutzer.verwalten")) {
+    return c.json(await listeBenutzerVoll());
+  }
+  return c.json(await listeBenutzerKurz());
+});
+
+const neuSchema = z.object({
+  benutzername: z.string().min(3).max(40),
+  anzeigename: z.string().min(1).max(120),
+  email: z.string().max(200).nullish(),
+  rolle: z.string().min(1).max(40),
+});
+
+benutzerRouten.post("/benutzer", darf("benutzer.verwalten"), async (c) => {
+  const daten = await gelesen(c, neuSchema);
+  const akteur = angemeldet(c);
+
+  const { benutzer, einmalpasswort } = await legeBenutzerAn(daten);
+  logInfo("Konto angelegt", { von: akteur.benutzername, neu: benutzer.benutzername });
+
+  // Das Einmalpasswort wird GENAU HIER einmal ausgeliefert und nirgends
+  // gespeichert. Wer es verliert, setzt es neu — das ist billiger als ein
+  // Passwort, das irgendwo im Klartext herumliegt.
+  return c.json({ benutzer, einmalpasswort }, 201);
+});
+
+benutzerRouten.patch("/benutzer/:id", darf("benutzer.verwalten"), async (c) => {
+  const daten = await gelesen(
+    c,
+    z.object({
+      anzeigename: z.string().min(1).max(120).optional(),
+      email: z.string().max(200).nullish(),
+      rolle: z.string().min(1).max(40).optional(),
+      aktiv: z.boolean().optional(),
+    }),
+  );
+  const akteur = angemeldet(c);
+  return c.json(await aendereBenutzer(pfadId(c), daten, akteur.id));
+});
+
+benutzerRouten.post("/benutzer/:id/passwort", darf("benutzer.verwalten"), async (c) => {
+  const akteur = angemeldet(c);
+  const ergebnis = await setzePasswortZurueck(pfadId(c), akteur.id);
+  logInfo("Passwort zurückgesetzt", { von: akteur.benutzername, konto: pfadId(c) });
+  return c.json(ergebnis);
+});
+
+// ── Rollen ─────────────────────────────────────────────────────────────────
+
+/** Der Rechte-Katalog, gruppiert — die Vorlage für die Häkchenliste. */
+benutzerRouten.get("/rechte", darf("benutzer.verwalten"), (c) =>
+  c.json({
+    rechte: RECHTE.map((r) => ({ id: r, ...RECHT_TEXT[r] })),
+    gruppen: rechteNachGruppe(),
+  }),
+);
+
+/**
+ * Rollen darf jeder LESEN, der angemeldet ist — die Oberfläche braucht die
+ * Namen, um sie neben Benutzern anzuzeigen. Ändern nur mit Recht.
+ */
+benutzerRouten.get("/rollen", async (c) => c.json(await listeRollen()));
+
+benutzerRouten.post("/rollen", darf("benutzer.verwalten"), async (c) => {
+  const daten = await gelesen(
+    c,
+    z.object({
+      id: z.string().min(2).max(30),
+      name: z.string().min(1).max(60),
+      beschreibung: z.string().max(500).nullish(),
+      rechte: z.array(z.string()).default([]),
+    }),
+  );
+  return c.json(await legeRolleAn(daten), 201);
+});
+
+benutzerRouten.patch("/rollen/:id", darf("benutzer.verwalten"), async (c) => {
+  const daten = await gelesen(
+    c,
+    z.object({
+      name: z.string().min(1).max(60).optional(),
+      beschreibung: z.string().max(500).nullish(),
+      rechte: z.array(z.string()).optional(),
+    }),
+  );
+  // Kein pfadId(): Rollen-Kennungen sind Text, keine UUID.
+  const id = c.req.param("id");
+  if (!id) throw new EingabeFehler("Die Rollen-Kennung fehlt.");
+  return c.json(await aendereRolle(id, daten));
+});
+
+benutzerRouten.delete("/rollen/:id", darf("benutzer.verwalten"), async (c) => {
+  const id = c.req.param("id");
+  if (!id) throw new EingabeFehler("Die Rollen-Kennung fehlt.");
+  await loescheRolle(id);
+  return c.json({ ok: true });
+});

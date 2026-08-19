@@ -1,0 +1,313 @@
+/* ============================================================
+   Grundlagen und Bausteine.
+   Klassen tragen wie in PATIO das Präfix "pt-".
+   ============================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--fs-15);
+  line-height: var(--lh-normal);
+  color: var(--fg-body);
+  background: var(--surface-subtle);
+  -webkit-font-smoothing: antialiased;
+  /* Verhindert, dass ein Doppeltipp die Seite zoomt — auf der Baustelle
+     tippt man schnell, und ein weggezoomter Sucher ist unbrauchbar. */
+  touch-action: manipulation;
+  /* Kein Gummiband-Effekt beim Überscrollen der Liste. */
+  overscroll-behavior-y: none;
+}
+
+h1,
+h2,
+h3,
+p,
+figure {
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Sichtbarer Fokus — Pflicht, nicht Kür. */
+:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+/* ── Knöpfe ─────────────────────────────────────────────── */
+.pt-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--tippziel);
+  padding: 0 var(--space-4);
+  font-size: var(--fs-15);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--tracking-tight);
+  color: var(--fg-body);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease);
+}
+.pt-btn:hover:not(:disabled) {
+  background: var(--surface-subtle);
+  border-color: var(--border-strong);
+}
+.pt-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.pt-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Primär = Ink auf Paper. Kein Farbakzent, wie in PATIO. */
+.pt-btn--primaer {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+}
+.pt-btn--primaer:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.pt-btn--still {
+  background: transparent;
+  border-color: transparent;
+}
+.pt-btn--still:hover:not(:disabled) {
+  background: var(--surface-muted);
+}
+
+.pt-btn--gefahr {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--danger);
+}
+
+.pt-btn--breit {
+  width: 100%;
+}
+.pt-btn--gross {
+  min-height: 56px;
+  font-size: var(--fs-16);
+  font-weight: var(--fw-semibold);
+}
+
+/* ── Eingabefelder ──────────────────────────────────────── */
+.pt-feld {
+  display: block;
+  width: 100%;
+  min-height: var(--tippziel);
+  padding: var(--space-3);
+  font-size: var(--fs-16); /* unter 16px zoomt iOS beim Fokussieren hinein */
+  color: var(--fg-body);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  transition: border-color var(--t-fast) var(--ease);
+}
+.pt-feld:focus {
+  outline: none;
+  border-color: var(--fg);
+  box-shadow: var(--shadow-focus);
+}
+.pt-feld::placeholder {
+  color: var(--fg-subtle);
+}
+
+.pt-label {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-size: var(--fs-13);
+  font-weight: var(--fw-medium);
+  color: var(--fg-muted);
+}
+
+/* ── Karten und Listen ──────────────────────────────────── */
+.pt-karte {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+}
+
+.pt-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.pt-liste > li + li {
+  border-top: 1px solid var(--hairline);
+}
+
+.pt-zeile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--tippziel);
+  padding: var(--space-3) var(--space-4);
+  background: none;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+}
+.pt-zeile:hover {
+  background: var(--surface-subtle);
+}
+
+.pt-zeile__haupt {
+  flex: 1;
+  min-width: 0;
+}
+.pt-zeile__titel {
+  font-weight: var(--fw-medium);
+  color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pt-zeile__unter {
+  font-size: var(--fs-13);
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Statusabzeichen ────────────────────────────────────────
+   Farbe allein genügt nicht: bei Sonnenlicht und bei
+   Farbsehschwäche trägt das Wort die Information, nicht der Ton.
+*/
+.pt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 3px var(--space-2);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-tight);
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.pt-chip--verfuegbar {
+  color: var(--success-fg);
+  background: var(--success-bg);
+  border-color: var(--success-fg);
+}
+.pt-chip--ausgegeben {
+  color: var(--info-fg);
+  background: var(--info-bg);
+  border-color: var(--info-fg);
+}
+.pt-chip--wartung {
+  color: var(--warning-fg);
+  background: var(--warning-bg);
+  border-color: var(--warning-fg);
+}
+.pt-chip--defekt {
+  color: var(--danger-fg);
+  background: var(--danger-bg);
+  border-color: var(--danger-fg);
+}
+.pt-chip--ausgemustert {
+  color: var(--fg-muted);
+  background: var(--surface-muted);
+  border-color: var(--border-strong);
+}
+.pt-chip--neutral {
+  color: var(--fg-muted);
+  background: var(--surface-muted);
+}
+
+/* ── Meldungen ──────────────────────────────────────────── */
+.pt-meldung {
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--fs-14);
+  border: 1px solid;
+  border-radius: var(--radius-lg);
+}
+.pt-meldung--fehler {
+  color: var(--danger-fg);
+  background: var(--danger-bg);
+  border-color: var(--danger-fg);
+}
+.pt-meldung--warnung {
+  color: var(--warning-fg);
+  background: var(--warning-bg);
+  border-color: var(--warning-fg);
+}
+.pt-meldung--erfolg {
+  color: var(--success-fg);
+  background: var(--success-bg);
+  border-color: var(--success-fg);
+}
+.pt-meldung--hinweis {
+  color: var(--fg-muted);
+  background: var(--surface-muted);
+  border-color: var(--border);
+}
+
+/* ── Kleinkram ──────────────────────────────────────────── */
+.pt-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.pt-gedaempft {
+  color: var(--fg-muted);
+}
+.pt-mikro {
+  font-size: var(--fs-11);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.pt-leer {
+  padding: var(--space-12) var(--space-4);
+  text-align: center;
+  color: var(--fg-muted);
+}
+
+/* Wer Bewegung nicht mag, bekommt keine. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

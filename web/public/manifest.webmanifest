@@ -1,0 +1,14 @@
+{
+  "name": "Geräte-Tracker",
+  "short_name": "Geräte",
+  "description": "Baustellengeräte scannen, ausgeben und zurücknehmen",
+  "start_url": "/scan",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#0a0a0a",
+  "lang": "de-AT",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

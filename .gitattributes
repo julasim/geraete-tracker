@@ -1,0 +1,13 @@
+# Im Repo steht IMMER LF — auch wenn hier unter Windows entwickelt wird.
+#
+# Der Grund ist der Container: Ein Shell-Skript oder eine Konfigurationsdatei
+# mit CRLF bricht unter Linux mit Meldungen wie "\r: not found" oder
+# "exec format error" ab. Das sind Fehler, die man auf dem Entwicklungsrechner
+# nie sieht und erst auf dem Mini-PC.
+* text=auto eol=lf
+
+# Binärdateien nie anfassen
+*.png binary
+*.jpg binary
+*.pdf binary
+*.woff2 binary

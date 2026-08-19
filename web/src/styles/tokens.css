@@ -1,0 +1,211 @@
+/* ============================================================
+   Geräte-Tracker — Design-Tokens
+   ------------------------------------------------------------
+   Übernommen aus PATIO (apps/patio/web/src/patio-tokens.css),
+   damit beide Anwendungen wie aus einem Haus aussehen.
+
+   Grundsätze, unverändert von dort:
+     * monochrom, flach, präzise, viel Ruhe
+     * KEIN Brand-Akzent — Akzent ist Ink (Schwarz bzw. Weiß)
+     * Hairline-Border statt Schatten
+     * kleine Radien: architektonisch, nicht verspielt
+     * 4pt-Raster, keine krummen Werte
+     * Light und Dark gleichwertig, nicht Dark als Nachgedanke
+
+   Zwei bewusste Abweichungen:
+
+   1. SCHRIFT: nur Systemschriften, kein Nachladen von außen.
+      PATIO hatte einen Google-Fonts-Import, der auf einem
+      Firmenserver ohne Internet jede Seite in einen Timeout
+      laufen ließ. Hier gar nicht erst eingebaut.
+
+   2. TIPPZIELE: größer als in PATIO. Dort wird mit der Maus im
+      Büro gearbeitet, hier mit dem Daumen auf der Baustelle —
+      teils mit Arbeitshandschuhen.
+   ============================================================ */
+
+:root {
+  /* ── Ink & Paper ───────────────────────────────────────── */
+  --ink: #0a0a0a;
+  --paper: #ffffff;
+
+  /* ── Flächen (hell) ────────────────────────────────────── */
+  --surface: #ffffff;
+  --surface-subtle: #fafafa;
+  --surface-muted: #f4f4f5;
+  --border: #e5e7eb;
+  --border-strong: #d4d4d8;
+  --hairline: #f0f0f1;
+
+  /* ── Flächen (dunkel) — nie reines Schwarz ─────────────── */
+  --surface-dark: #0f0f11;
+  --surface-dark-subtle: #18181b;
+  --surface-dark-muted: #1f1f23;
+  --border-dark: #27272a;
+  --border-dark-strong: #3f3f46;
+  --hairline-dark: #1d1d20;
+
+  /* ── Vordergrund: vier Lesestufen, nicht mehr ──────────── */
+  --fg: #0a0a0a;
+  --fg-body: #18181b;
+  --fg-muted: #52525b;
+  --fg-subtle: #a1a1aa;
+  --fg-inverse: #ffffff;
+
+  --fg-dark: #f4f4f5;
+  --fg-dark-body: #e4e4e7;
+  --fg-dark-muted: #a1a1aa;
+  --fg-dark-subtle: #71717a;
+  --fg-dark-inverse: #0a0a0a;
+
+  /* ── Status — funktional, nie dekorativ ────────────────── */
+  --success: #22c55e;
+  --success-fg: #15803d;
+  --success-bg: #f0fdf4;
+  --warning: #f59e0b;
+  --warning-fg: #b45309;
+  --warning-bg: #fffbeb;
+  --danger: #dc2626;
+  --danger-fg: #b91c1c;
+  --danger-bg: #fef2f2;
+  --info-fg: #1d4ed8;
+  --info-bg: #eff6ff;
+
+  /* ── Akzent = Ink. Es gibt keine Markenfarbe. ──────────── */
+  --accent: var(--ink);
+  --accent-hover: #1f1f23;
+  --accent-fg: #ffffff;
+
+  /* ── Schrift: ausschließlich vom System ────────────────── */
+  --font-sans: "Helvetica Neue", Helvetica, Arial, system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* ── Größenskala ───────────────────────────────────────── */
+  --fs-11: 11px;
+  --fs-12: 12px;
+  --fs-13: 13px;
+  --fs-14: 14px;
+  --fs-15: 15px;
+  --fs-16: 16px;
+  --fs-18: 18px;
+  --fs-20: 20px;
+  --fs-24: 24px;
+  --fs-30: 30px;
+  --fs-36: 36px;
+
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  --lh-tight: 1.1;
+  --lh-snug: 1.25;
+  --lh-normal: 1.45;
+  --lh-relaxed: 1.6;
+
+  --tracking-tight: -0.015em;
+  --tracking-normal: 0;
+  --tracking-label: 0.08em;
+
+  /* ── Radien — klein gehalten ───────────────────────────── */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-full: 9999px;
+
+  /* ── Raster: 4pt ───────────────────────────────────────── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ── Schatten: selten, nur für Schwebendes ─────────────── */
+  --shadow-ring: 0 0 0 1px var(--border);
+  --shadow-focus: 0 0 0 2px rgba(10, 10, 10, 0.1);
+  --shadow-sm: 0 1px 2px rgba(10, 10, 10, 0.04);
+  --shadow-md: 0 4px 12px rgba(10, 10, 10, 0.06);
+  --shadow-lg: 0 12px 32px rgba(10, 10, 10, 0.08);
+
+  /* ── Bewegung: ein Tempo, eine Kurve ───────────────────── */
+  --t-fast: 120ms;
+  --t-base: 180ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+
+  /* ── Maße ──────────────────────────────────────────────── */
+  --tippziel: 48px; /* Mindestgröße für alles Antippbare */
+  --leiste-hoehe: 60px; /* untere Navigationsleiste */
+  --kopf-hoehe: 52px;
+  --container: 780px;
+}
+
+/* ── Dunkelmodus ─────────────────────────────────────────── */
+html.dunkel,
+[data-theme="dunkel"] {
+  --surface: var(--surface-dark);
+  --surface-subtle: var(--surface-dark-subtle);
+  --surface-muted: var(--surface-dark-muted);
+  --border: var(--border-dark);
+  --border-strong: var(--border-dark-strong);
+  --hairline: var(--hairline-dark);
+
+  --fg: var(--fg-dark);
+  --fg-body: var(--fg-dark-body);
+  --fg-muted: var(--fg-dark-muted);
+  --fg-subtle: var(--fg-dark-subtle);
+  --fg-inverse: var(--fg-dark-inverse);
+
+  --accent: var(--fg-dark);
+  --accent-hover: #d4d4d8;
+  --accent-fg: #0a0a0a;
+
+  --success-bg: #06210f;
+  --warning-bg: #251a06;
+  --danger-bg: #2a0d0d;
+  --info-bg: #0c1730;
+  --success-fg: #4ade80;
+  --warning-fg: #fbbf24;
+  --danger-fg: #f87171;
+  --info-fg: #93b4fd;
+
+  --shadow-focus: 0 0 0 2px rgba(244, 244, 245, 0.14);
+}
+
+/* Wer nichts eingestellt hat, bekommt die Einstellung des Geräts. */
+@media (prefers-color-scheme: dark) {
+  html:not(.hell) {
+    --surface: var(--surface-dark);
+    --surface-subtle: var(--surface-dark-subtle);
+    --surface-muted: var(--surface-dark-muted);
+    --border: var(--border-dark);
+    --border-strong: var(--border-dark-strong);
+    --hairline: var(--hairline-dark);
+
+    --fg: var(--fg-dark);
+    --fg-body: var(--fg-dark-body);
+    --fg-muted: var(--fg-dark-muted);
+    --fg-subtle: var(--fg-dark-subtle);
+    --fg-inverse: var(--fg-dark-inverse);
+
+    --accent: var(--fg-dark);
+    --accent-hover: #d4d4d8;
+    --accent-fg: #0a0a0a;
+
+    --success-bg: #06210f;
+    --warning-bg: #251a06;
+    --danger-bg: #2a0d0d;
+    --info-bg: #0c1730;
+    --success-fg: #4ade80;
+    --warning-fg: #fbbf24;
+    --danger-fg: #f87171;
+    --info-fg: #93b4fd;
+  }
+}

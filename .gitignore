@@ -1,0 +1,29 @@
+# Abhängigkeiten und Bauergebnisse
+node_modules/
+dist/
+web/dist/
+
+# Geheimnisse — niemals ins Repo
+.env
+.env.*
+!.env.example
+
+# Laufzeitdaten
+daten/
+*.log
+vite.log
+
+# Lokales Tooling (Workspace-Konvention)
+.claude/
+
+# Betriebssystem / Editor
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/
+
+# Wegwerf-Testwerkzeug aus AP1: node_modules und Bauergebnis nicht,
+# der Quellcode schon (dokumentiert, wie das Format bestimmt wurde)
+scanner-test/node_modules/
+scanner-test/dist/
+scanner-test/public/test-etikett.png
