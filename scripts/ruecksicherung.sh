@@ -33,12 +33,16 @@ DATEI_DATEI="$ZIEL/dateien_$STEMPEL.tar.gz"
 
 [ -f "$DB_DATEI" ] || { echo "Nicht gefunden: $DB_DATEI"; exit 1; }
 
-if [ -f .env ]; then
-  # shellcheck disable=SC1091
-  set -a; . ./.env; set +a
-fi
-DB_BENUTZER="${POSTGRES_USER:-tracker}"
-DB_NAME="${POSTGRES_DB:-tracker}"
+# Zugangsdaten aus der .env — bewusst NICHT per "source": Dort dürfen Werte
+# mit Leerzeichen ohne Anführungszeichen stehen (Compose verträgt das,
+# FIRMENNAME=SIMA INFRA Construction GmbH etwa), und die Shell bricht dann mit
+# "INFRA: command not found" ab. Beim Bau genau so passiert.
+wert_aus_env() {
+  [ -f .env ] || return 0
+  sed -n "s/^$1=//p" .env | tail -1 | sed 's/^"//; s/"$//'
+}
+DB_BENUTZER="$(wert_aus_env POSTGRES_USER)"; DB_BENUTZER="${DB_BENUTZER:-tracker}"
+DB_NAME="$(wert_aus_env POSTGRES_DB)";      DB_NAME="${DB_NAME:-tracker}"
 
 echo "Zurückgespielt wird der Stand von $STEMPEL."
 echo "Der AKTUELLE Stand geht dabei verloren."
