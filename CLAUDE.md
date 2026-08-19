@@ -363,7 +363,7 @@ damit sich die Anlage **vor Ort** prüfen lässt.
 - **`USER node` (uid 1000)**, `/data` gehört ihm. Ein eingehängtes
   Host-Verzeichnis, das root gehört, wäre der klassische `EACCES`-Fall.
 - **`.gitattributes` mit `eol=lf`.** Hier wird unter Windows entwickelt; eine
-  Datei mit CRLF bricht im Container mit „: not found" ab — ein Fehler, den
+  Datei mit CRLF bricht im Container mit „CR: not found" ab — ein Fehler, den
   man auf dem eigenen Rechner nie sieht.
 - **Healthcheck ohne curl**, Node kann seit v18 selbst `fetch`. Kein zusätzliches
   Paket im Abbild.
