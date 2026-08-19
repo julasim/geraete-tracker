@@ -8,7 +8,7 @@
  */
 
 import "dotenv/config";
-import { db, schliesseDb, warteAufDb } from "../src/db/client.js";
+import { db, schliesseDb, warteAufDb } from "../db/client.js";
 
 let fehler = 0;
 const sql = db();

@@ -15,8 +15,8 @@
 
 import "dotenv/config";
 import { stdin, stdout } from "node:process";
-import { db, schliesseDb, warteAufDb } from "../src/db/client.js";
-import { hashePasswort, istGeleakt, pruefeRegeln } from "../src/domain/passwort.js";
+import { db, schliesseDb, warteAufDb } from "../db/client.js";
+import { hashePasswort, istGeleakt, pruefeRegeln } from "../domain/passwort.js";
 
 function argument(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);

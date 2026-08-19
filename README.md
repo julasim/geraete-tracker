@@ -88,7 +88,7 @@ node scripts/durchlauf-benutzer.mjs <name> <passwort>   # Konten, Rollen, Sperre
 Und die Datenbank selbst:
 
 ```bash
-npx tsx scripts/pruefe-schema.ts    # 19 Schutzregeln am laufenden Schema
+npm run pruefe:schema    # 19 Schutzregeln am laufenden Schema
 ```
 
 Zum Ansehen mit Inhalt: `node scripts/beispieldaten.mjs <name> <passwort>`

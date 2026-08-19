@@ -6,8 +6,8 @@
  */
 
 import "dotenv/config";
-import { migriere, migrationsStand } from "../src/db/migrate.js";
-import { schliesseDb, warteAufDb } from "../src/db/client.js";
+import { migriere, migrationsStand } from "../db/migrate.js";
+import { schliesseDb, warteAufDb } from "../db/client.js";
 
 const nurStatus = process.argv.includes("--status");
 

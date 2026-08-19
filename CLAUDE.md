@@ -30,7 +30,7 @@ node scripts/durchlauf-buchen.mjs <name> <pw>     # Baustellen-Weg: scannen, buc
 node scripts/durchlauf-pflege.mjs <name> <pw>     # Fotos, Prüfungen, Schäden, Zubehör
 node scripts/durchlauf-erfassung.mjs <name> <pw>  # Anlegen, Export, Excel-Runde, Import
 node scripts/beispieldaten.mjs <name> <pw>        # Bestand zum Ansehen
-npx tsx scripts/pruefe-schema.ts                  # 19 Schutzregeln der DB
+npm run pruefe:schema                             # 19 Schutzregeln der DB
 ```
 
 Die Oberfläche liegt unter **http://localhost:3000** — derselbe Prozess liefert
@@ -52,7 +52,7 @@ Protokoll: [`docs/scanner-abnahme.md`](docs/scanner-abnahme.md).
 
 **AP2 — Gerüst und Datenbank.** Sechs Migrationen, Konfiguration, Logger mit
 Geheimnis-Filter, Migrationslauf mit Sperre, `benutzer:anlegen`.
-`scripts/pruefe-schema.ts` prüft **19 Schutzregeln am laufenden Schema** — alle grün.
+`src/werkzeuge/pruefe-schema.ts` prüft **19 Schutzregeln am laufenden Schema** — alle grün.
 
 **AP3 — Anmeldung und API-Grundgerüst.** Hono-Kette mit **Standard-gesperrt**,
 argon2id, JWT im httpOnly-Cookie mit `token_version`-Widerruf, dreistufige Bremse,
@@ -123,7 +123,7 @@ behoben:
    „vue-tsc ist entweder falsch geschrieben oder konnte nicht gefunden werden"
    ab — für einen Neuling eine Sackgasse. Jetzt hängt `npm --prefix web install`
    als `postinstall` daran, die Installation ist einstufig.
-2. **`scripts/pruefe-schema.ts` legte ein Konto mit der Rolle `admin` an**, die
+2. **Die Schemaprüfung legte ein Konto mit der Rolle `admin` an**, die
    es seit AP10 nicht mehr gibt → Fremdschlüsselfehler. Beim Umstellen
    übersehen, weil das Skript nicht Teil von `npm test` ist.
 3. **Ein abgebrochener Lauf machte die Schemaprüfung dauerhaft rot.** Das

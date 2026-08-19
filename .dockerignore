@@ -1,0 +1,28 @@
+# Was nie ins Bau-Abbild gehört.
+#
+# Ohne diese Liste würde Docker den ganzen Ordner an den Daemon schicken —
+# samt node_modules und Fotos. Das dauert Minuten und macht das Abbild groß.
+
+node_modules
+web/node_modules
+scanner-test/node_modules
+dist
+web/dist
+
+# Geheimnisse und Laufzeitdaten
+.env
+.env.*
+!.env.example
+daten/
+sicherung/
+*.log
+
+# Nur für die Entwicklung
+.git
+.gitignore
+.claude/
+tests/
+scanner-test/
+docs/
+*.md
+!README.md

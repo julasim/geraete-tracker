@@ -1,0 +1,86 @@
+# Geräte-Tracker auf dem Mini-PC.
+#
+# Zwei Dienste: die Anwendung und ihre Datenbank. Die Datenbank hat bewusst
+# KEIN "ports:" — sie ist nur über das interne Netz erreichbar. Stünde dort
+# ein Port, wäre Postgres im ganzen Büro-WLAN offen.
+#
+#   docker compose up -d --build     starten
+#   docker compose logs -f app       zusehen
+#   docker compose down              anhalten (Daten bleiben)
+
+services:
+  app:
+    build: .
+    image: geraete-tracker:neueste
+    container_name: tracker-app
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      API_PORT: 3000
+      APP_HOSTNAME: ${APP_HOSTNAME:-localhost}
+      # Wird hier zusammengesetzt, damit das Passwort nur an einer Stelle steht.
+      DATABASE_URL: postgres://${POSTGRES_USER:-tracker}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-tracker}
+      DB_AUTO_MIGRATE: "true"
+      JWT_SECRET: ${JWT_SECRET}
+      # Hinter dem Tunnel liegt echtes HTTPS — ohne das kommt kein Cookie an.
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      SESSION_TAGE: ${SESSION_TAGE:-30}
+      PASSWORT_MIN_LAENGE: ${PASSWORT_MIN_LAENGE:-12}
+      LEAK_PRUEFUNG: ${LEAK_PRUEFUNG:-true}
+      SPERRE_NACH_VERSUCHEN: ${SPERRE_NACH_VERSUCHEN:-10}
+      SPERRE_MINUTEN: ${SPERRE_MINUTEN:-15}
+      FIRMENNAME: ${FIRMENNAME:-}
+      ETIKETT_FORMAT: ${ETIKETT_FORMAT:-70x37}
+      UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-5}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      # Fotos und Anhänge überleben jedes Neubauen des Abbilds.
+      - fotos:/data
+    ports:
+      # Nur auf dem Mini-PC selbst erreichbar (127.0.0.1), nicht im Netz.
+      # Nach außen geht es ausschließlich über den Tunnel. Wer die App im
+      # Büro-WLAN direkt erreichen will, ändert das auf "3000:3000" — und
+      # weiß dann, dass sie dort unverschlüsselt steht.
+      - "127.0.0.1:${HOST_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16
+    container_name: tracker-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tracker}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-tracker}
+    volumes:
+      - datenbank:/var/lib/postgresql/data
+    healthcheck:
+      # Ohne diese Prüfung startet die App gegen eine Datenbank, die noch
+      # hochfährt, und stirbt beim ersten Migrationslauf.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tracker} -d ${POSTGRES_DB:-tracker}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    # KEIN ports: — die Datenbank bleibt im internen Netz.
+
+  # Öffentliche Adresse ohne Portfreigabe am Router.
+  #
+  # Nur aktiv mit:  docker compose --profile tunnel up -d
+  # Das Token kommt aus dem Cloudflare-Zero-Trust-Dashboard; der Tunnel dort
+  # zeigt auf  http://app:3000  (Dienstname, nicht localhost — aus Sicht des
+  # Tunnel-Containers ist localhost er selbst).
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: tracker-tunnel
+    restart: unless-stopped
+    profiles: ["tunnel"]
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      - app
+
+volumes:
+  datenbank:
+  fotos:
