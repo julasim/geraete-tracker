@@ -340,13 +340,58 @@ keine Rolle, kein Anmeldeverhalten.
 **Konten werden nie gelöscht, nur stillgelegt.** Der Name steht in jeder
 Buchung, die die Person erfasst hat.
 
-## Nächster Schritt: Deployment
+## AP11 — Docker-Paket für den Mini-PC (2026-08-19)
 
-Deployment auf den Mini-PC (Docker Compose, Cloudflare Tunnel, Backup mit
-geprüftem Rückspielweg).
+Zweistufiges `Dockerfile` (bauen / laufen), `docker-compose.yml` mit App und
+Postgres, Cloudflare-Tunnel als optionales Profil, Sicherung und Rückspielweg
+als Skripte. Anleitung: [`docs/BETRIEB.md`](docs/BETRIEB.md).
 
-**Weiterhin offen und unabhängig davon:** der Kamera-Test am echten Etikett mit
-dem iPad. Braucht eine HTTPS-Adresse, siehe `docs/scanner-abnahme.md`.
+**Der Fund, der das Paket sonst unbrauchbar gemacht hätte:** `scripts/` wird
+von `tsc` **nicht** gebaut (`include: ["src/**/*.ts"]`). Im Container hätte es
+also kein `benutzer:anlegen` gegeben — und ohne erstes Konto kommt niemand in
+eine frische Installation. Die drei Betriebswerkzeuge liegen deshalb jetzt
+unter `src/werkzeuge/` und landen in `dist/`. Die Durchlauf-Skripte (`.mjs`,
+kein Bau nötig) bleiben in `scripts/` und werden ins Laufzeit-Abbild kopiert,
+damit sich die Anlage **vor Ort** prüfen lässt.
+
+**Weitere Entscheidungen:**
+- **`tini` als Einstiegsprozess.** Ohne echten init-Prozess bekommt Node kein
+  SIGTERM; `docker compose down` wartet dann jedes Mal zehn Sekunden auf den
+  harten Abschuss.
+- **Die Datenbank hat kein `ports:`.** Sie ist nur im internen Netz erreichbar.
+  Die App horcht auf `127.0.0.1` — nach außen geht es allein über den Tunnel.
+- **`USER node` (uid 1000)**, `/data` gehört ihm. Ein eingehängtes
+  Host-Verzeichnis, das root gehört, wäre der klassische `EACCES`-Fall.
+- **`.gitattributes` mit `eol=lf`.** Hier wird unter Windows entwickelt; eine
+  Datei mit CRLF bricht im Container mit „: not found" ab — ein Fehler, den
+  man auf dem eigenen Rechner nie sieht.
+- **Healthcheck ohne curl**, Node kann seit v18 selbst `fetch`. Kein zusätzliches
+  Paket im Abbild.
+
+**Geprüft, nicht vermutet** (alles in WSL Ubuntu-24.04 gegen einen echten Klon):
+Bau aus dem Repo · Start beider Container bis `healthy` · alle neun Migrationen
+von selbst · erstes Konto im Container · **alle sechs Durchläufe im Container** ·
+19 Schutzregeln · läuft als uid 1000 · Datenbank nicht von außen erreichbar ·
+`down`/`up` ohne Datenverlust · **Update-Weg** (`git pull` + `--build`) ohne
+Datenverlust · **Rückspielweg echt durchgespielt**: nach `down -v` — also
+vollständigem Verlust beider Volumes — waren 28 Geräte, 4 Buchungen, 2 Konten
+und die Fotos wieder da, Anmeldung funktionierte.
+
+**Beim Bauen gefunden und behoben:** `npm run build` scheiterte im Abbild, weil
+`scripts/kopiere-migrationen.mjs` fehlte. Und die Sicherungsskripte lasen die
+`.env` per `source` — `FIRMENNAME=SIMA INFRA Construction GmbH` (Leerzeichen
+ohne Anführungszeichen, was Compose verträgt) ließ sie mit
+„INFRA: command not found" abbrechen. Sie lesen die zwei Werte jetzt gezielt
+per `sed`.
+
+## Nächster Schritt
+
+**Kamera-Abnahme am echten Etikett** mit iPad und Android — braucht die
+HTTPS-Adresse, steht also erst nach dem ersten Aufsetzen an. Protokoll:
+`docs/scanner-abnahme.md`.
+
+Danach: Bestand erfassen (Import oder einzeln), Etiketten für Geräte ohne
+Aufkleber drucken.
 
 ## Konventionen
 

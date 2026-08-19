@@ -9,6 +9,25 @@ Ohne Kamera geht es genauso: Nummer eintippen.
 
 ---
 
+## Auf dem Mini-PC betreiben (Docker)
+
+Der Weg für den Echtbetrieb — zwei Container, keine Node-Installation nötig:
+
+```bash
+git clone <repo-adresse> geraete-tracker
+cd geraete-tracker
+cp .env.example .env      # POSTGRES_PASSWORD und JWT_SECRET setzen!
+docker compose up -d --build
+docker compose exec app node dist/werkzeuge/benutzer-anlegen.js --name julius --rolle verwaltung
+```
+
+Vollständig mit Tunnel, Sicherung und Fehlersuche:
+**[`docs/BETRIEB.md`](docs/BETRIEB.md)**.
+
+Alles Weitere hier beschreibt die **Entwicklung** auf dem eigenen Rechner.
+
+---
+
 ## Voraussetzungen
 
 - **Node 24** (`node --version`)
@@ -135,11 +154,14 @@ anpassen" und schrumpfen den Barcode um 3–5 %. Vorher den Testbogen ausprobier
 
 ```
 src/          Server: api/ (Routen), data/ (Datenbankzugriff),
-              domain/ (Fachlogik, ohne Datenbank), db/migrations/
+              domain/ (Fachlogik, ohne Datenbank), db/migrations/,
+              werkzeuge/ (Kontoanlage, Migration, Schemaprüfung — werden
+              mitkompiliert, damit sie auch im Container zur Verfügung stehen)
 web/          Vue-3-Oberfläche (mobile-first, Navigation unten)
-scripts/      Migrationen, Kontoanlage, Durchläufe, Schemaprüfung
 tests/        323 Tests (Vitest)
-docs/         PLAN.md, BEDIENUNG.md, scanner-abnahme.md
+docs/         BETRIEB.md (Mini-PC), BEDIENUNG.md (Benutzer und Rollen),
+              PLAN.md, scanner-abnahme.md
+scripts/      Durchläufe gegen die laufende App, Sicherung, Rückspielweg
 ```
 
 Technisch: Node 24 · TypeScript ESM strict · Hono 4 · PostgreSQL 16 über
