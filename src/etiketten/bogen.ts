@@ -88,18 +88,18 @@ export const FORMATE: Record<string, Etikettenformat> = {
   },
 };
 
+/**
+ * Auf dem Etikett stehen Barcode, Nummer im Klartext und der Firmenname —
+ * mehr nicht.
+ *
+ * Es gab einmal ein Feld für die Gerätebezeichnung. Gezeichnet wurde es nie,
+ * obwohl der Kommentar daneben das behauptete und alle Aufrufer es brav
+ * mitgaben. Entfernt, statt es nachzurüsten: Bei 37 mm Höhe ginge eine
+ * weitere Zeile nur auf Kosten der Barcode-Höhe oder der Ruhezone — und
+ * beides entscheidet darüber, ob sich das Etikett später scannen lässt.
+ */
 export interface Etikett {
   code: string;
-  /**
-   * Wird derzeit NICHT gedruckt.
-   *
-   * Auf dem Etikett stehen Barcode, Nummer im Klartext und der Firmenname —
-   * mehr passt bei 37 mm Höhe nicht, ohne die Ruhezone oder die Lesbarkeit
-   * der Nummer anzutasten. Das Feld bleibt, weil die Aufrufer es mitgeben
-   * und eine spätere Zeile denkbar ist; der frühere Kommentar behauptete
-   * fälschlich, es werde gesetzt.
-   */
-  bezeichnung?: string;
 }
 
 export interface BogenOptionen {

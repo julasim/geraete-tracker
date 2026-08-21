@@ -63,7 +63,7 @@ etikettenRouten.post("/etiketten/vorrat", darf("etiketten.drucken"), async (c) =
   const nummern = await reserviereNummern(anzahl, akteur.id);
 
   const pdf = await baueBogen(
-    nummern.map((code) => ({ code, bezeichnung: "" })),
+    nummern.map((code) => ({ code })),
     {
       format: (format ?? ETIKETT_FORMAT) as keyof typeof FORMATE,
       firmenname: FIRMENNAME,
@@ -153,8 +153,8 @@ etikettenRouten.post("/etiketten", darf("etiketten.drucken"), async (c) => {
   }
   const { geraete: ids, format, startPosition } = gelesen.data;
 
-  const zeilen = await db()<{ inventarnummer: string; bezeichnung: string }[]>`
-    SELECT inventarnummer, bezeichnung FROM geraete
+  const zeilen = await db()<{ inventarnummer: string }[]>`
+    SELECT inventarnummer FROM geraete
      WHERE id = ANY(${ids}) AND inventarnummer IS NOT NULL
      ORDER BY inventarnummer`;
 
@@ -163,7 +163,7 @@ etikettenRouten.post("/etiketten", darf("etiketten.drucken"), async (c) => {
   }
 
   const pdf = await baueBogen(
-    zeilen.map((z) => ({ code: z.inventarnummer, bezeichnung: z.bezeichnung })),
+    zeilen.map((z) => ({ code: z.inventarnummer })),
     {
       format: (format ?? ETIKETT_FORMAT) as keyof typeof FORMATE,
       firmenname: FIRMENNAME,
