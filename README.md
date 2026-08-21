@@ -91,7 +91,7 @@ API und Web-Anwendung aus.
 npm test
 ```
 
-323 Tests. Zusätzlich sechs Durchläufe **gegen die laufende Anwendung** — die
+338 Tests. Zusätzlich sechs Durchläufe **gegen die laufende Anwendung** — die
 Testsuite läuft im selben Prozess und würde nicht merken, wenn der gebaute
 Server gar nicht startet:
 
@@ -107,7 +107,7 @@ node scripts/durchlauf-benutzer.mjs <name> <passwort>   # Konten, Rollen, Sperre
 Und die Datenbank selbst:
 
 ```bash
-npm run pruefe:schema    # 19 Schutzregeln am laufenden Schema
+npm run pruefe:schema    # 23 Schutzregeln am laufenden Schema
 ```
 
 Zum Ansehen mit Inhalt: `node scripts/beispieldaten.mjs <name> <passwort>`
@@ -158,7 +158,7 @@ src/          Server: api/ (Routen), data/ (Datenbankzugriff),
               werkzeuge/ (Kontoanlage, Migration, Schemaprüfung — werden
               mitkompiliert, damit sie auch im Container zur Verfügung stehen)
 web/          Vue-3-Oberfläche (mobile-first, Navigation unten)
-tests/        323 Tests (Vitest)
+tests/        338 Tests (Vitest)
 docs/         BETRIEB.md (Mini-PC), BEDIENUNG.md (Benutzer und Rollen),
               PLAN.md, scanner-abnahme.md
 scripts/      Durchläufe gegen die laufende App, Sicherung, Rückspielweg

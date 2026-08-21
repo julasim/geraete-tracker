@@ -20,6 +20,7 @@ import { findeGeraetNachCode } from "../../data/geraete.js";
 import { bestandAmLagerplatz, findeLagerplatzNachCode } from "../../data/stammdaten.js";
 import { historie } from "../../data/buchungen.js";
 import { faelligeFuerGeraet } from "../../data/pruefungen.js";
+import { merkeGesehen } from "../../data/nummern.js";
 
 export const scanRouten = new Hono<AppEnv>();
 
@@ -95,6 +96,17 @@ scanRouten.get("/scan/:code", async (c) => {
   }
 
   if (!geraet) {
+    /**
+     * Ein Etikett, das die Anwendung nicht kennt, klebt trotzdem auf etwas.
+     * Genau so erfährt sie vom Altbestand: Die Nummer wird als belegt
+     * vermerkt und danach nie an ein anderes Gerät vergeben.
+     *
+     * Bewusst still und ohne Fehlerweitergabe — der Scan ist ein
+     * Lesevorgang, und ein Fehler beim Mitschreiben darf ihn nicht
+     * scheitern lassen. Der Mitarbeiter auf der Baustelle merkt davon nichts.
+     */
+    void merkeGesehen(code, angemeldet(c).id).catch(() => {});
+
     return c.json(
       {
         typ: "unbekannt" as const,
@@ -102,7 +114,7 @@ scanRouten.get("/scan/:code", async (c) => {
         grund: "geraet_nicht_erfasst",
         anlegbar: darfGeraetAnlegen,
         hinweis: darfGeraetAnlegen
-          ? "Dieses Gerät ist noch nicht erfasst."
+          ? "Dieses Gerät ist noch nicht erfasst. Die Nummer ist ab jetzt reserviert."
           : "Dieses Gerät ist nicht erfasst. Bitte im Büro melden.",
       },
       404,

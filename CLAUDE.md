@@ -4,7 +4,7 @@ Web-Anwendung für Handy und iPad: Baumaschinen mit vorhandenen 1D-Strichcode-Et
 scannen, ausgeben, zurücknehmen — mit lückenloser Historie, wer ein Gerät wann auf
 welche Baustelle gebracht hat.
 
-**Stand: 2026-08-19 — AP1 bis AP11 fertig, als Docker-Paket lauffähig.** Anmelden, scannen, ausgeben,
+**Stand: 2026-08-21 — AP1 bis AP12 fertig, als Docker-Paket lauffähig.** Anmelden, scannen, ausgeben,
 zurücknehmen, umbuchen; Fotos und Dokumente; Prüfungen; Schäden; Zubehör;
 Geräte anlegen und bearbeiten, Import/Export als Tabelle, Etikettendruck;
 **Benutzerverwaltung in der Oberfläche mit frei zusammenstellbaren Rollen.**
@@ -33,7 +33,7 @@ node scripts/durchlauf-buchen.mjs <name> <pw>     # Baustellen-Weg: scannen, buc
 node scripts/durchlauf-pflege.mjs <name> <pw>     # Fotos, Prüfungen, Schäden, Zubehör
 node scripts/durchlauf-erfassung.mjs <name> <pw>  # Anlegen, Export, Excel-Runde, Import
 node scripts/beispieldaten.mjs <name> <pw>        # Bestand zum Ansehen
-npm run pruefe:schema                             # 19 Schutzregeln der DB
+npm run pruefe:schema                             # 23 Schutzregeln der DB
 ```
 
 Die Oberfläche liegt unter **http://localhost:3000** — derselbe Prozess liefert
@@ -55,7 +55,7 @@ Protokoll: [`docs/scanner-abnahme.md`](docs/scanner-abnahme.md).
 
 **AP2 — Gerüst und Datenbank.** Sechs Migrationen, Konfiguration, Logger mit
 Geheimnis-Filter, Migrationslauf mit Sperre, `benutzer:anlegen`.
-`src/werkzeuge/pruefe-schema.ts` prüft **19 Schutzregeln am laufenden Schema** — alle grün.
+`src/werkzeuge/pruefe-schema.ts` prüft **23 Schutzregeln am laufenden Schema** — alle grün.
 
 **AP3 — Anmeldung und API-Grundgerüst.** Hono-Kette mit **Standard-gesperrt**,
 argon2id, JWT im httpOnly-Cookie mit `token_version`-Widerruf, dreistufige Bremse,
@@ -387,6 +387,79 @@ und die Fotos wieder da, Anmeldung funktionierte.
 ohne Anführungszeichen, was Compose verträgt) ließ sie mit
 „INFRA: command not found" abbrechen. Sie lesen die zwei Werte jetzt gezielt
 per `sed`.
+
+## AP12 — Nummernregister: keine Nummer geht zweimal hinaus (2026-08-21)
+
+Julius' Vorgabe: „Beim Etikettendruck dürfen keine Nummern gedruckt werden, die
+es im System schon gibt."
+
+**Der Druck war nie das Problem** — er nimmt ausschließlich Geräte aus dem
+Bestand. **Die Vergabe war es.** `naechsteFreieNummerInTx` las den Höchstwert
+der ERFASSTEN Geräte. Während der Ersterfassung kleben draußen aber Etiketten,
+die das System nicht kennt: Kennt es 10001–10113 und kleben real 10001–10200,
+vergibt es 10114 — eine Nummer, die schon auf einer Maschine klebt. Ein
+doppeltes Etikett fällt niemandem auf, bis ein Scan das falsche Gerät zeigt.
+
+**Neue Tabelle `etikettennummern`** (Migration 010) mit drei Zuständen:
+`vergeben` (ein Gerät trägt sie) · `reserviert` (auf Vorrat gedruckt) ·
+`gesehen` (beim Scannen aufgetaucht, kein Gerät dazu). Die Vergabe fragt ab
+sofort dieses Register.
+
+**Was dazukam:**
+- `POST /etiketten/vorrat` — Bogen mit neuen Nummern, die **vor** dem Druck
+  reserviert werden. Für den Bauhof-Ablauf: drucken, kleben, später erfassen.
+- Der Scan **lernt dazu**: Ein unbekanntes Etikett wird als `gesehen` vermerkt
+  und danach nie automatisch vergeben. Das ist die einzige Möglichkeit, von
+  Altetiketten zu erfahren, die nie erfasst wurden.
+- `POST /etiketten/altbestand` — einen Bereich als belegt eintragen, falls
+  jemand weiß, bis wohin die alten Aufkleber reichen. Kein Pflichtschritt.
+- Vorratsdruck und Nummernstand in der Etiketten-Ansicht.
+
+**Zwei Fallen, die beim Bauen auffielen:**
+1. **Ersatzetiketten zogen den Nummernkreis mit.** Ein Zusatzetikett `90001`
+   hätte die Vergabe von 10114 auf 90002 springen lassen und 80.000 Nummern
+   liegen gelassen. Deshalb `zaehlt_fuer_vergabe`: Zusatzetiketten sind
+   verbraucht, zählen aber nicht für den laufenden Kreis.
+2. **Der Import ging am Register vorbei** — er las den Höchstwert aus der
+   Gerätetabelle. Ausgerechnet der Weg, mit dem 200 Maschinen erfasst werden.
+   Aufgefallen, weil ein Test dafür rot wurde, nachdem er zuerst aus dem
+   falschen Grund grün war.
+
+**Der Scan darf die Nummer nicht sperren, die er gerade meldet.** Erster
+Entwurf: `gesehen` blockiert das Anlegen. Damit war genau der Normalfall tot —
+scannen, „nicht erfasst", anlegen. Jetzt blockiert nur `vergeben` mit Gerät;
+`reserviert` und `gesehen` sind ausdrücklich erlaubt und holen ihr Gerät ab.
+
+**Am laufenden System nachgemessen:** Vorratsbogen 10575–10598 gedruckt → das
+nächste automatisch angelegte Gerät bekam 10599, sprang also über den ganzen
+Bogen. Etikett 10575 ließ sich für ein Gerät verwenden. Ein Scan von 10700
+(unbekannt) machte die Nummer sofort zu `gesehen`, das nächste Gerät bekam
+10701. **15 neue Tests**, vier Gegenproben (Vergabe ohne Register · Import ohne
+Register · Scan ohne Mitschrift) — jede macht die zugehörigen Tests rot.
+
+**Der schwerwiegendste Fund kam aus dem eigenen Testlauf: Ein Vertipper hätte
+den Nummernkreis zerstört.** Ein Scan von `99999` trug die Nummer als
+`gesehen` ein — und weil die Vergabe den Höchstwert des Registers nahm, sprang
+die nächste Nummer auf 100000. Ab da wäre jedes Etikett sechsstellig gewesen,
+wegen einer falsch eingetippten Handeingabe.
+
+Die Vergabe beantwortet deshalb jetzt **zwei getrennte Fragen**:
+1. *Wo steht die Reihe?* Nur `vergeben` und `reserviert` — also Nummern, die
+   kontrolliert ausgegeben wurden.
+2. *Ist DIESE Nummer frei?* Jeder Eintrag zählt, auch `gesehen`. Klebt 10114
+   draußen und wurde gescannt, wird sie übersprungen.
+
+Dieselbe Regel im Import. Gegengeprüft: ohne den Schutz vergibt die Anwendung
+16140 statt 11138.
+
+**Der Test dafür war zuerst wertlos** — er scannte fest `99999`, und der
+Nummernkreis der Entwicklungsdatenbank lag zu dem Zeitpunkt darüber. Er prüft
+jetzt relativ zum aktuellen Stand. *Merksatz: Eine Gegenprobe, die grün bleibt,
+ist ein Befund über den Test, nicht über den Code.*
+
+**Sperrzeit:** `reserviereNummern` und `merkeBereich` schreiben in EINEM Insert.
+Mit einer Schleife über 500 Einzel-Inserts hielten sie die Nummernsperre
+sekundenlang — im Testlauf liefen prompt andere Dateien in Zeitüberschreitungen.
 
 ## Nächster Schritt
 

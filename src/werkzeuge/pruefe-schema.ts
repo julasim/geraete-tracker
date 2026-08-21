@@ -57,6 +57,8 @@ await sql`
 await sql`CREATE RULE buchungen_kein_update AS ON UPDATE TO buchungen DO INSTEAD NOTHING`;
 await sql`CREATE RULE buchungen_kein_delete AS ON DELETE TO buchungen DO INSTEAD NOTHING`;
 
+await sql`DELETE FROM etikettennummern
+           WHERE geraet_id IN (SELECT id FROM geraete WHERE bezeichnung = 'PRUEF-Testgerät')`;
 await sql`DELETE FROM geraete WHERE bezeichnung = 'PRUEF-Testgerät'`;
 await sql`DELETE FROM lagerplaetze WHERE bezeichnung LIKE 'PRUEF-%'`;
 await sql`DELETE FROM benutzer WHERE benutzername = 'pruef-konto'`;
@@ -217,7 +219,42 @@ await pruefe("Eine Rolle, die niemand trägt, lässt sich löschen", async () =>
   if (z?.n !== 0) throw new Error("Prüfrolle blieb stehen");
 });
 
+// ── Nummernregister ────────────────────────────────────────────────────────
+
+await pruefe("Der Bestand steht vollständig im Nummernregister", async () => {
+  // Das eigene Prüfgerät ausgenommen: Es wird hier per rohem SQL angelegt,
+  // also bewusst am Register vorbei — sonst meldete diese Prüfung sich selbst.
+  const [fehlt] = await sql<{ n: number }[]>`
+    SELECT count(*)::int AS n
+      FROM geraete g
+     WHERE g.inventarnummer IS NOT NULL
+       AND g.id <> ${geraet.id}
+       AND NOT EXISTS (SELECT 1 FROM etikettennummern e WHERE e.nummer = g.inventarnummer)`;
+  if ((fehlt?.n ?? 0) > 0) {
+    throw new Error(
+      `${fehlt!.n} Gerätenummer(n) fehlen im Register — sie könnten erneut vergeben werden`,
+    );
+  }
+});
+
+await pruefe("Auch jedes Etikett steht im Register", async () => {
+  const [fehlt] = await sql<{ n: number }[]>`
+    SELECT count(*)::int AS n
+      FROM geraete_barcodes b
+     WHERE b.geraet_id <> ${geraet.id}
+       AND NOT EXISTS (SELECT 1 FROM etikettennummern e WHERE e.nummer = b.barcode)`;
+  if ((fehlt?.n ?? 0) > 0) throw new Error(`${fehlt!.n} Etikett(en) fehlen im Register`);
+});
+
+await mussScheitern("Dieselbe Nummer lässt sich nicht zweimal eintragen", () =>
+  sql`INSERT INTO etikettennummern (nummer, zustand)
+      SELECT nummer, 'gesehen' FROM etikettennummern LIMIT 1`);
+
+await mussScheitern("Ein erfundener Zustand wird abgelehnt", () =>
+  sql`INSERT INTO etikettennummern (nummer, zustand) VALUES ('PRUEF-99999', 'irgendwas')`);
+
 // ── Aufräumen ──────────────────────────────────────────────────────────────
+await sql`DELETE FROM etikettennummern WHERE nummer LIKE 'PRUEF-%'`;
 // Buchungen lassen sich weder ändern noch löschen — genau das ist ja der
 // Zweck. Zum Aufräumen müssen beide Regeln kurz weichen: das Löschen der
 // Zeile löst wegen der Selbstreferenz storniert_durch intern auch ein
@@ -227,6 +264,7 @@ await sql`DROP RULE IF EXISTS buchungen_kein_update ON buchungen`;
 await sql`DELETE FROM buchungen WHERE geraet_id = ${geraet.id}`;
 await sql`CREATE RULE buchungen_kein_update AS ON UPDATE TO buchungen DO INSTEAD NOTHING`;
 await sql`CREATE RULE buchungen_kein_delete AS ON DELETE TO buchungen DO INSTEAD NOTHING`;
+await sql`DELETE FROM etikettennummern WHERE geraet_id = ${geraet.id}`;
 await sql`DELETE FROM geraete WHERE id = ${geraet.id}`;
 await sql`DELETE FROM lagerplaetze WHERE bezeichnung LIKE 'PRUEF-%'`;
 await sql`DELETE FROM benutzer WHERE id = ${konto.id}`;

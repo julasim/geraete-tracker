@@ -10,7 +10,8 @@
 import type postgres from "postgres";
 import { db } from "../db/client.js";
 import { KonfliktFehler, NichtGefunden, RegelFehler } from "../api/fehler.js";
-import { codeArt, naechsteNummer, normalisiere, suchVarianten } from "../domain/barcode.js";
+import { codeArt, normalisiere, suchVarianten } from "../domain/barcode.js";
+import { naechsteFreieNummerInTx, vergibNummerInTx } from "./nummern.js";
 
 export type GeraetStatus =
   | "verfuegbar"
@@ -215,6 +216,27 @@ export async function legeGeraetAn(daten: NeuesGeraet, akteurId: string): Promis
       SELECT geraet_id FROM geraete_barcodes WHERE barcode = ${barcode}`;
     if (codeVergeben) throw new RegelFehler(`Das Etikett ${barcode} gehört bereits zu einem Gerät.`);
 
+    /**
+     * Und gegen das Register: Eine Nummer kann belegt sein, ohne dass ein
+     * Gerät sie trägt.
+     *
+     * "reserviert" (auf Vorrat gedruckt) und "gesehen" (beim Scannen
+     * aufgetaucht) sind hier ausdrücklich KEIN Hindernis — im Gegenteil,
+     * das ist der Normalfall: Etikett kleben, scannen, "noch nicht erfasst",
+     * Gerät anlegen. Die Nummer holt jetzt ihr Gerät ab. Nur eine Nummer,
+     * die bereits an einem Gerät hängt, wird abgewiesen.
+     *
+     * Was das Register verhindert, ist etwas anderes: dass die AUTOMATISCHE
+     * Vergabe eine solche Nummer ein zweites Mal ausgibt.
+     */
+    for (const kandidat of new Set([nummer, barcode])) {
+      const [bekannt] = await tx<{ zustand: string; geraet_id: string | null }[]>`
+        SELECT zustand, geraet_id FROM etikettennummern WHERE nummer = ${kandidat}`;
+      if (bekannt?.zustand === "vergeben" && bekannt.geraet_id) {
+        throw new RegelFehler(`Die Nummer ${kandidat} gehört bereits zu einem Gerät.`);
+      }
+    }
+
     const zeilen = await tx<{ id: string }[]>`
       INSERT INTO geraete (inventarnummer, bezeichnung, hersteller, modell, seriennummer,
                            anschaffungsdatum, anschaffungswert, notiz, betriebsstunden,
@@ -230,6 +252,14 @@ export async function legeGeraetAn(daten: NeuesGeraet, akteurId: string): Promis
     await tx`INSERT INTO geraete_barcodes (barcode, geraet_id, erfasst_von)
              VALUES (${barcode}, ${neueId}, ${akteurId})`;
 
+    // Beide ins Register — die Nummer gilt ab jetzt als verbraucht, auch
+    // wenn das Gerät später gelöscht wird.
+    await vergibNummerInTx(tx, nummer, neueId, akteurId);
+    if (barcode !== nummer) {
+      // Zusatzetikett: gilt als verbraucht, zählt aber nicht für die Vergabe.
+      await vergibNummerInTx(tx, barcode, neueId, akteurId, false);
+    }
+
     if (daten.schlagworte?.length) {
       await tx`INSERT INTO geraet_schlagworte ${tx(
         daten.schlagworte.map((wid) => ({ geraet_id: neueId, schlagwort_id: wid })),
@@ -242,36 +272,15 @@ export async function legeGeraetAn(daten: NeuesGeraet, akteurId: string): Promis
 }
 
 /**
- * Sperre für den Nummernkreis. Beliebige, aber feste Zahl — alle Vergaben
- * dieser Anwendung nehmen dieselbe.
+ * Die Nummernvergabe liegt seit dem Etikettenregister in `data/nummern.ts`.
+ *
+ * Der Grund für den Umzug: Sie fragte den Höchstwert der ERFASSTEN Geräte ab.
+ * Während der Ersterfassung kleben draußen aber Etiketten, die das System
+ * noch nicht kennt — und irgendwann trifft die Vergabe eine davon. Dann
+ * klebt dieselbe Nummer zweimal, und ein Scan zeigt das falsche Gerät.
+ * Das Register kennt zusätzlich reservierte und beim Scannen aufgetauchte
+ * Nummern.
  */
-const SPERRE_NUMMERNKREIS = 7_319_777;
-
-/**
- * Die nächste freie Gerätenummer, ermittelt INNERHALB einer laufenden
- * Transaktion.
- *
- * Die Sperre ist der entscheidende Teil. Ohne sie lesen zwei gleichzeitige
- * Anlagen denselben Höchstwert, rechnen dieselbe Nummer aus und halten sie
- * beide für frei — der eindeutige Index rettet zwar die Daten, aber einer
- * der beiden bekommt einen Datenbankfehler statt einer Nummer. Beim Erfassen
- * von 200 Maschinen zu zweit ist das kein Grenzfall mehr, sondern Alltag.
- *
- * `pg_advisory_xact_lock` fällt am Transaktionsende von selbst, auch wenn
- * diese abbricht. Es kann also nichts hängen bleiben.
- *
- * Bewusst KEINE Postgres-Sequenz: die zählt bei einem Abbruch weiter und
- * reißt Lücken. Eine Inventarnummer wird auf ein Etikett geklebt und soll
- * fortlaufend sein.
- */
-async function naechsteFreieNummerInTx(tx: postgres.TransactionSql): Promise<string> {
-  await tx`SELECT pg_advisory_xact_lock(${SPERRE_NUMMERNKREIS})`;
-  const [hoechste] = await tx<{ inventarnummer: string }[]>`
-    SELECT inventarnummer FROM geraete
-     WHERE inventarnummer ~ '^[0-9]+$'
-     ORDER BY inventarnummer::bigint DESC LIMIT 1`;
-  return naechsteNummer(hoechste?.inventarnummer ?? null);
-}
 
 export interface GeraetAenderung {
   bezeichnung?: string;
@@ -407,8 +416,27 @@ export async function ergaenzeBarcode(
     );
   }
 
-  await db()`INSERT INTO geraete_barcodes (barcode, geraet_id, erfasst_von)
+  /**
+   * Auch gegen das Register prüfen: Die Nummer kann auf einem Vorratsbogen
+   * stehen oder beim Scannen aufgetaucht sein, ohne dass ein Gerät sie trägt.
+   * Ein "gesehenes" Etikett klebt bereits irgendwo — es hier ein zweites Mal
+   * zu vergeben, hieße dieselbe Nummer an zwei Maschinen.
+   */
+  const [imRegister] = await db()<{ zustand: string }[]>`
+    SELECT zustand FROM etikettennummern WHERE nummer = ${barcode}`;
+  if (imRegister?.zustand === "gesehen") {
+    throw new RegelFehler(
+      `Das Etikett ${barcode} ist beim Scannen bereits aufgetaucht und klebt damit auf ` +
+        `einem Gerät, das noch nicht erfasst ist. Bitte eine andere Nummer verwenden.`,
+    );
+  }
+
+  await db().begin(async (tx) => {
+    await tx`INSERT INTO geraete_barcodes (barcode, geraet_id, erfasst_von)
              VALUES (${barcode}, ${geraetId}, ${akteurId})`;
+    // Zusatzetikett: verbraucht, zählt aber nicht für den laufenden Kreis.
+    await vergibNummerInTx(tx, barcode, geraetId, akteurId, false);
+  });
   return barcode;
 }
 

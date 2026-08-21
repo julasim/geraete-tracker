@@ -14,8 +14,98 @@ import { EingabeFehler } from "../fehler.js";
 import { db } from "../../db/client.js";
 import { FIRMENNAME, ETIKETT_FORMAT } from "../../config.js";
 import { baueBogen, baueTestbogen, FORMATE } from "../../etiketten/bogen.js";
+import {
+  merkeBereich,
+  nummernUebersicht,
+  offeneReservierungen,
+  reserviereNummern,
+} from "../../data/nummern.js";
+import { angemeldet } from "../auth.js";
 
 export const etikettenRouten = new Hono<AppEnv>();
+
+/**
+ * Stand des Nummernkreises — was ist vergeben, was reserviert, was ist beim
+ * Scannen aufgetaucht. Die Oberfläche zeigt daraus, welche Nummer als
+ * nächste käme.
+ */
+etikettenRouten.get("/etiketten/nummern", darf("etiketten.drucken"), async (c) =>
+  c.json({
+    ...(await nummernUebersicht()),
+    offen: await offeneReservierungen(),
+  }),
+);
+
+/**
+ * Etiketten auf Vorrat: neue Nummern erzeugen, drucken, kleben — erfassen
+ * später.
+ *
+ * Die Nummern werden VOR dem Druck reserviert und sind damit sofort
+ * verbraucht. Landet der Bogen im Papierkorb, ist eine Handvoll Nummern
+ * verloren — das kostet nichts. Käme dieselbe Nummer ein zweites Mal
+ * heraus, klebte sie zweimal, und kein Scan wäre mehr eindeutig.
+ */
+etikettenRouten.post("/etiketten/vorrat", darf("etiketten.drucken"), async (c) => {
+  const roh = await c.req.json().catch(() => null);
+  const gelesen = z
+    .object({
+      anzahl: z.number().int().min(1).max(500),
+      format: z.string().max(20).optional(),
+      startPosition: z.number().int().min(0).max(100).optional(),
+    })
+    .safeParse(roh);
+  if (!gelesen.success) {
+    throw new EingabeFehler("Bitte eine Anzahl zwischen 1 und 500 angeben.");
+  }
+  const { anzahl, format, startPosition } = gelesen.data;
+  const akteur = angemeldet(c);
+
+  const nummern = await reserviereNummern(anzahl, akteur.id);
+
+  const pdf = await baueBogen(
+    nummern.map((code) => ({ code, bezeichnung: "" })),
+    {
+      format: (format ?? ETIKETT_FORMAT) as keyof typeof FORMATE,
+      firmenname: FIRMENNAME,
+      ...(startPosition !== undefined ? { startPosition } : {}),
+    },
+  );
+
+  c.header("Content-Type", "application/pdf");
+  c.header("Content-Disposition", 'inline; filename="etiketten-vorrat.pdf"');
+  c.header("Cache-Control", "no-store");
+  // Damit die Oberfläche anzeigen kann, welche Nummern auf dem Bogen stehen.
+  c.header("X-Nummern-Von", nummern[0] ?? "");
+  c.header("X-Nummern-Bis", nummern[nummern.length - 1] ?? "");
+  return c.body(new Uint8Array(pdf));
+});
+
+/**
+ * Einen Bereich alter, bereits geklebter Etiketten als belegt eintragen.
+ *
+ * Für den Fall, dass jemand weiß, bis wohin die Aufkleber im Bauhof reichen.
+ * Kein Pflichtschritt — die Anwendung ist auch ohne diese Angabe sicher,
+ * weil sie beim Scannen dazulernt.
+ */
+etikettenRouten.post("/etiketten/altbestand", darf("etiketten.drucken"), async (c) => {
+  const roh = await c.req.json().catch(() => null);
+  const gelesen = z
+    .object({ von: z.string().regex(/^\d{1,10}$/), bis: z.string().regex(/^\d{1,10}$/) })
+    .safeParse(roh);
+  if (!gelesen.success) {
+    throw new EingabeFehler("Bitte zwei Nummern angeben, etwa 10001 und 10200.");
+  }
+  const { von, bis } = gelesen.data;
+  if (Number(bis) - Number(von) > 5000) {
+    throw new EingabeFehler("Der Bereich ist zu groß — höchstens 5000 Nummern auf einmal.");
+  }
+  const akteur = angemeldet(c);
+  try {
+    return c.json(await merkeBereich(von, bis, akteur.id));
+  } catch (fehler) {
+    throw new EingabeFehler(fehler instanceof Error ? fehler.message : "Bereich nicht lesbar.");
+  }
+});
 
 /** Die verfügbaren Bogenformate — für die Auswahl in der Oberfläche. */
 etikettenRouten.get("/etiketten/formate", darf("etiketten.drucken"), (c) =>

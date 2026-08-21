@@ -1,4 +1,58 @@
-# Bedienung: Benutzer und Rollen
+# Bedienung
+
+Etiketten drucken, Benutzer anlegen, Rollen vergeben.
+
+---
+
+# Etiketten drucken
+
+## Für ein Gerät, das schon erfasst ist
+
+**Mehr → Etiketten drucken → Bogen.** Geräte auswählen, Bogen drucken. Gedruckt
+wird die Nummer, die das Gerät bereits trägt — für ein Ersatzetikett, wenn der
+alte Aufkleber abgerissen ist. Das alte bleibt gültig; ein Gerät darf mehrere
+Etiketten tragen.
+
+## Auf Vorrat, für Geräte ohne Aufkleber
+
+**Mehr → Etiketten drucken → Neue Etiketten auf Vorrat.** Stückzahl angeben,
+drucken, kleben — erfassen später. Die Ansicht zeigt vorher, welche Nummer als
+nächste käme.
+
+**Die Nummern sind ab dem Druck vergeben.** Auch wenn der Bogen im Papierkorb
+landet: Eine verlorene Nummer kostet nichts, eine doppelt geklebte kostet die
+Verlässlichkeit des ganzen Bestands.
+
+Wenn Sie das Gerät später erfassen, geben Sie die geklebte Nummer einfach an —
+sie wartet im System schon darauf.
+
+## Keine Nummer geht zweimal hinaus
+
+Die Anwendung führt ein Register über **jede** Nummer, die ihr je begegnet ist:
+
+| | |
+|---|---|
+| **vergeben** | Ein Gerät trägt sie |
+| **reserviert** | Auf Vorrat gedruckt, Gerät folgt noch |
+| **gesehen** | Beim Scannen aufgetaucht, aber kein Gerät dazu |
+
+Die fortlaufende Vergabe überspringt alle drei. Damit kann weder der Druck noch
+das Anlegen noch ein Import eine Nummer erwischen, die schon draußen ist.
+
+**Das System lernt beim Scannen dazu.** Scannt jemand ein altes Etikett, das nie
+erfasst wurde, merkt sich die Anwendung diese Nummer sofort als belegt — auch
+wenn niemand das Gerät gleich anlegt.
+
+> **Was keine Software wissen kann:** ein Etikett, das auf einer Maschine klebt,
+> ohne je gescannt, gedruckt oder erfasst worden zu sein. Solange die
+> Ersterfassung läuft, kleben solche Aufkleber im Bauhof. Wenn Sie wissen, bis
+> zu welcher Nummer die alten Etiketten reichen, tragen Sie den Bereich einmal
+> ein — dann ist auch diese Lücke zu. Nötig ist es nicht: Beim ersten Scan
+> erfährt die Anwendung ohnehin davon.
+
+---
+
+# Benutzer und Rollen
 
 Wer darf was, und wie kommt ein neuer Mitarbeiter an sein Passwort.
 

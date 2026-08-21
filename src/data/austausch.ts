@@ -8,6 +8,7 @@
 import type postgres from "postgres";
 import { db } from "../db/client.js";
 import { RegelFehler } from "../api/fehler.js";
+import { vergibNummerInTx } from "./nummern.js";
 import { datumFuerExport, schreibeCsv, zahlFuerExport } from "../domain/csv.js";
 import {
   pruefeZeilen,
@@ -174,19 +175,40 @@ export async function schreibeImport(
       wortId.set(name.toLowerCase(), neu!.id);
     }
 
-    // Höchste Nummer einmal lesen und selbst hochzählen — 200 Mal dieselbe
-    // Abfrage wäre unnötig, und die Sperre halten wir ohnehin.
-    const [hoechste] = await tx<{ inventarnummer: string }[]>`
-      SELECT inventarnummer FROM geraete
-       WHERE inventarnummer ~ '^[0-9]+$'
-       ORDER BY inventarnummer::bigint DESC LIMIT 1`;
-    let naechste = Number(hoechste?.inventarnummer ?? 10_000);
+    /**
+     * Höchste Nummer einmal lesen und selbst hochzählen — 200 Mal dieselbe
+     * Abfrage wäre unnötig, und die Sperre halten wir ohnehin.
+     *
+     * Gelesen wird das REGISTER, nicht die Gerätetabelle: Dort stehen auch
+     * die auf Vorrat gedruckten und die beim Scannen aufgetauchten Nummern.
+     * Sonst vergäbe ein Import von 200 Zeilen fröhlich Nummern, die längst
+     * auf einem Bogen stehen oder draußen kleben.
+     */
+    const [hoechste] = await tx<{ nummer: string }[]>`
+      SELECT nummer FROM etikettennummern
+       WHERE (nummer)::text ~ '^[0-9]+$' AND zaehlt_fuer_vergabe
+         AND zustand IN ('vergeben', 'reserviert')
+       ORDER BY (nummer)::text::bigint DESC LIMIT 1`;
+    let naechste = Number(hoechste?.nummer ?? 10_000);
+
+    // Was oberhalb der Reihe schon belegt ist, wird übersprungen: gesehene
+    // Altetiketten und Nummern von Vorratsbögen.
+    const belegteZeilen = await tx<{ n: string }[]>`
+      SELECT (nummer)::text AS n FROM etikettennummern
+       WHERE (nummer)::text ~ '^[0-9]+$'
+         AND (nummer)::text::bigint > ${naechste}`;
+    const belegt = new Set(belegteZeilen.map((z) => Number(z.n)));
+    const naechsteFreie = (): number => {
+      do naechste++;
+      while (belegt.has(naechste));
+      return naechste;
+    };
 
     for (const zeile of ergebnis.zeilen) {
       if (zeile.art === "unveraendert") continue;
 
       if (zeile.art === "neu") {
-        const nummer = zeile.inventarnummer ?? String(++naechste).padStart(5, "0");
+        const nummer = zeile.inventarnummer ?? String(naechsteFreie()).padStart(5, "0");
         if (zeile.inventarnummer) {
           const alsZahl = Number(zeile.inventarnummer);
           if (Number.isFinite(alsZahl) && alsZahl > naechste) naechste = alsZahl;
@@ -232,6 +254,9 @@ async function legeAn(
 
   await tx`INSERT INTO geraete_barcodes (barcode, geraet_id, erfasst_von)
            VALUES (${nummer}, ${neu!.id}, ${akteurId})`;
+
+  // Ins Nummernregister — auch der Import verbraucht Nummern.
+  await vergibNummerInTx(tx, nummer, neu!.id, akteurId);
 
   await setzeSchlagworte(tx, neu!.id, zeile.schlagworte, wortId);
 }

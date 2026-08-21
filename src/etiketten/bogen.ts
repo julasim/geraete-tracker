@@ -90,7 +90,15 @@ export const FORMATE: Record<string, Etikettenformat> = {
 
 export interface Etikett {
   code: string;
-  /** Wird klein unter die Nummer gesetzt, wenn Platz ist. */
+  /**
+   * Wird derzeit NICHT gedruckt.
+   *
+   * Auf dem Etikett stehen Barcode, Nummer im Klartext und der Firmenname —
+   * mehr passt bei 37 mm Höhe nicht, ohne die Ruhezone oder die Lesbarkeit
+   * der Nummer anzutasten. Das Feld bleibt, weil die Aufrufer es mitgeben
+   * und eine spätere Zeile denkbar ist; der frühere Kommentar behauptete
+   * fälschlich, es werde gesetzt.
+   */
   bezeichnung?: string;
 }
 

@@ -33,6 +33,26 @@ const suchtext = ref("");
 const laeuft = ref(false);
 const fehler = ref<string | null>(null);
 
+/** Wie viele Etiketten auf Vorrat gedruckt werden sollen. */
+const vorratAnzahl = ref(24);
+const vorratLaeuft = ref(false);
+const vorratErgebnis = ref<string | null>(null);
+
+interface Nummernstand {
+  vergeben: number;
+  reserviert: number;
+  gesehen: number;
+  hoechste: string | null;
+  offen: { nummer: string }[];
+}
+const stand = ref<Nummernstand | null>(null);
+
+const naechsteNummer = computed(() =>
+  stand.value?.hoechste
+    ? String(Number(stand.value.hoechste) + 1).padStart(stand.value.hoechste.length, "0")
+    : "10001",
+);
+
 const liste = computed(() => bestand.suche(suchtext.value));
 const anzahl = computed(() => gewaehlt.value.size);
 const proBogen = computed(
@@ -54,7 +74,62 @@ onMounted(async () => {
   } catch {
     // Die Auswahl ist Beiwerk — ohne sie greift die Voreinstellung.
   }
+  await ladeStand();
 });
+
+async function ladeStand(): Promise<void> {
+  try {
+    stand.value = await api.get<Nummernstand>("/etiketten/nummern");
+  } catch {
+    stand.value = null;
+  }
+}
+
+/**
+ * Etiketten auf Vorrat: neue Nummern erzeugen und drucken.
+ *
+ * Die Nummern sind ab dem Druck verbraucht — auch wenn der Bogen im
+ * Papierkorb landet. Das ist Absicht: Eine verlorene Nummer kostet nichts,
+ * eine doppelt geklebte kostet die Verlässlichkeit des ganzen Bestands.
+ */
+async function vorratDrucken(): Promise<void> {
+  if (vorratLaeuft.value) return;
+  if (!confirm(
+    `${vorratAnzahl.value} neue Nummern ab ${naechsteNummer.value} erzeugen und drucken?
+
+` +
+      "Diese Nummern sind danach vergeben und werden nie erneut ausgegeben.",
+  )) return;
+
+  vorratLaeuft.value = true;
+  fehler.value = null;
+  vorratErgebnis.value = null;
+  try {
+    const antwort = await fetch("/api/etiketten/vorrat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({
+        anzahl: vorratAnzahl.value,
+        format: format.value,
+        startPosition: startPosition.value,
+      }),
+    });
+    if (!antwort.ok) {
+      const daten = await antwort.json().catch(() => ({}));
+      throw new Error(daten.error ?? "Der Vorratsbogen konnte nicht erzeugt werden");
+    }
+    const von = antwort.headers.get("X-Nummern-Von");
+    const bis = antwort.headers.get("X-Nummern-Bis");
+    vorratErgebnis.value = `${von} bis ${bis} — gedruckt und reserviert.`;
+    window.open(URL.createObjectURL(await antwort.blob()), "_blank");
+    await ladeStand();
+  } catch (f) {
+    fehler.value = f instanceof Error ? f.message : "Der Vorratsbogen konnte nicht erzeugt werden";
+  } finally {
+    vorratLaeuft.value = false;
+  }
+}
 
 function umschalten(id: string): void {
   const neu = new Set(gewaehlt.value);
@@ -143,6 +218,57 @@ async function drucken(): Promise<void> {
       </section>
 
       <section>
+        <h2 class="pt-mikro abschnitt">Neue Etiketten auf Vorrat</h2>
+        <div class="pt-karte block">
+          <p class="text">
+            Für Geräte, die noch nicht erfasst sind: Bogen drucken, aufkleben,
+            später in Ruhe erfassen. Die Nummern werden dabei <strong>sofort
+            reserviert</strong> und nie ein zweites Mal vergeben.
+          </p>
+
+          <div v-if="stand" class="stand">
+            <div class="stand__zeile">
+              <span>Nächste freie Nummer</span>
+              <strong class="pt-mono">{{ naechsteNummer }}</strong>
+            </div>
+            <div class="stand__zeile">
+              <span>Vergeben</span><strong>{{ stand.vergeben }}</strong>
+            </div>
+            <div v-if="stand.reserviert" class="stand__zeile">
+              <span>Gedruckt, noch nicht erfasst</span>
+              <strong>{{ stand.reserviert }}</strong>
+            </div>
+            <div v-if="stand.gesehen" class="stand__zeile">
+              <span>Beim Scannen aufgetaucht</span>
+              <strong>{{ stand.gesehen }}</strong>
+            </div>
+          </div>
+
+          <div class="feld">
+            <label class="pt-label" for="anzahl">Wie viele Etiketten?</label>
+            <input
+              id="anzahl"
+              v-model.number="vorratAnzahl"
+              class="pt-feld"
+              type="number"
+              min="1"
+              max="500"
+            />
+          </div>
+
+          <p v-if="vorratErgebnis" class="pt-meldung">{{ vorratErgebnis }}</p>
+
+          <button
+            class="pt-btn pt-btn--primaer pt-btn--breit"
+            :disabled="vorratLaeuft || vorratAnzahl < 1"
+            @click="vorratDrucken"
+          >
+            {{ vorratLaeuft ? "Wird erzeugt …" : `${vorratAnzahl} Etiketten drucken` }}
+          </button>
+        </div>
+      </section>
+
+      <section>
         <h2 class="pt-mikro abschnitt">Bogen</h2>
         <div class="pt-karte block">
           <div class="feld">
@@ -226,6 +352,24 @@ async function drucken(): Promise<void> {
 </template>
 
 <style scoped>
+.stand {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-4);
+  background: var(--surface-subtle);
+}
+.stand__zeile {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--hairline);
+  font-size: var(--fs-13);
+  color: var(--fg-muted);
+}
+.stand__zeile:last-child { border-bottom: 0; }
+.stand__zeile strong { color: var(--fg); font-variant-numeric: tabular-nums; }
+
 .inhalt {
   padding: var(--space-4);
   padding-bottom: calc(var(--leiste-hoehe) + 80px);
