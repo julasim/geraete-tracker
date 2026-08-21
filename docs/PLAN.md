@@ -2,6 +2,22 @@
 
 Stand 2026-08-16. **Bewusst klein gehalten:** ~200 Maschinen, eine Handvoll Mitarbeiter.
 
+> **Dieser Plan ist das Dokument von vor dem Bau.** Er ist an drei Stellen von
+> der Umsetzung überholt worden; wo das der Fall ist, steht es im Text. Der
+> aktuelle Stand steht in [`../CLAUDE.md`](../CLAUDE.md), der Betrieb in
+> [`BETRIEB.md`](BETRIEB.md).
+>
+> 1. **Kein Cloudflare-Tunnel** (Entscheidung vom 2026-08-21). Der Eingang ist
+>    **Caddy**, der das Zertifikat selbst holt — entweder von Let's Encrypt
+>    (Portfreigabe am Router) oder selbst ausgestellt fürs Büro-Netz. Damit
+>    entfallen auch die Cloudflare-Funktionen aus Kapitel 12: Herkunftsfilter,
+>    Bot-Abwehr und die vorgelagerte Ratenbegrenzung. Die Anmeldebremse in der
+>    Anwendung bleibt und war ohnehin die tragende Schicht.
+> 2. **AP10 ist die Benutzerverwaltung geworden**, nicht das Deployment. Der
+>    Betrieb kam als AP11, das Nummernregister als AP12, der Eingang als AP13.
+> 3. **Ein Nummernregister** war nicht vorgesehen. Ohne es hätte die Vergabe
+>    Nummern ausgegeben, die auf noch nicht erfassten Maschinen kleben.
+
 ---
 
 # 1. Kontext
@@ -335,7 +351,7 @@ Die App steht offen im Internet. Niemand darf ohne gültige Zugangsdaten hinein,
 - **Wachsende Verzögerung** ab dem 3. Fehlversuch: 1 s, 2 s, 4 s, 8 s … Für einen Vertipper unmerklich, für ein Rateprogramm tödlich.
 - **Kontosperre** nach 10 Fehlversuchen für 15 Minuten. Damit bleiben höchstens ~40 Versuche pro Stunde und Konto.
 - **Ratenbegrenzung** getrennt nach IP und nach Konto.
-- **Cloudflare davor:** Europa bleibt vollständig offen, geblockt werden außereuropäischer Verkehr und bekannte Angriffsnetze. Das nimmt den Großteil automatisierter Versuche weg, bevor sie den Mini-PC erreichen. Für den Schutz **nicht tragend** — die Punkte darüber wirken unabhängig davon.
+- ~~**Cloudflare davor:** Herkunftsfilter, Bot-Abwehr, vorgelagerte Ratenbegrenzung.~~ **Entfallen** (2026-08-21, kein Tunnel). War ausdrücklich als „nicht tragend" eingestuft — die Punkte darüber wirken unabhängig davon und sind alle gebaut. Wer die vorgelagerte Filterung dennoch will, kommt um einen Dienst davor nicht herum.
 - **Kein Rückschluss, welche Konten existieren:** bei unbekannter Kennung rechnet der Server trotzdem einen Vergleichs-Hash und antwortet gleich lange mit derselben Meldung.
 
 Praktisch heißt das: Bei ~40 Versuchen pro Stunde ist selbst eine kurze Passphrase aus vier gewöhnlichen Wörtern nicht in menschlichen Zeiträumen zu raten. Der realistische Angriffsweg ist ein **anderswo wiederverwendetes** Passwort — dagegen wirkt 5.2.
@@ -379,7 +395,7 @@ Ein neuer Endpunkt ist damit automatisch geschützt — Vergessen führt zur Spe
 - **Uploads:** ≤ 5 MB, nur jpeg/png/webp, Typ an den **Magic Bytes** geprüft (nicht am Dateinamen), Name durch UUID ersetzt, Ablage außerhalb des statischen Ordners.
 - **Fehlermeldungen** ohne Stacktrace, SQL oder Pfade. Details ins Log.
 - **Datenbank von außen unerreichbar:** kein `ports:` in der Compose-Datei, nur internes Docker-Netz.
-- **Kein offener Port am Router** — der Cloudflare-Tunnel baut von innen nach außen auf.
+- ~~**Kein offener Port am Router** — der Cloudflare-Tunnel baut von innen nach außen auf.~~ **Überholt:** Ohne Tunnel braucht der Weg aus dem Internet eine Portfreigabe (80/443 auf den Mini-PC). Wer keinen offenen Port will, betreibt die Anwendung nur im Büro-Netz oder legt ein VPN davor.
 - `npm audit` im Pre-Push-Hook, `gitleaks` (Konfiguration aus `apps/patio/.gitleaks.toml`), `.env` nie im Repo.
 
 ---
@@ -543,7 +559,7 @@ Zehn statt zwanzig. Jedes endet mit grünem `npx tsc --noEmit`, grünen Tests un
 | **AP7** | **Scan-Flow.** Gerätekarte, Ausgeben, Zurücknehmen, Umbuchen, Bestätigung, „Nächstes scannen", unbekannter Barcode → anlegen. **Hier entscheidet sich die Alltagstauglichkeit — mit echten Daumen testen, nicht mit der Maus.** Ab hier ist die App im Alltag benutzbar |
 | **AP8** | **Listen, Prüfungen, Schäden.** Geräteliste mit Filtern (im Browser), Detail mit Historie, Standort-Ansicht, Dashboard. Prüfarten + Prüfung eintragen + Ampelliste + **Warnung auf der Gerätekarte beim Scannen**. Schadensmeldung mit Foto (`useFoto()` verkleinert im Browser, Server prüft Magic Bytes, Auslieferung nur mit Anmeldung, `ausfall` sperrt das Gerät) |
 | **AP9** | **Benutzerverwaltung, Etiketten, Export.** Konten anlegen/deaktivieren/Passwort zurücksetzen, „alle Sitzungen beenden", Ansicht der fehlgeschlagenen Anmeldungen. `bwip-js` + `pdfkit` für Etiketten im **vorhandenen** Codeformat (aus AP1), Bogenlayout. CSV-Export Bestand und Historie |
-| **AP10** | **Deployment & Abnahme.** Compose (postgres + app + caddy + cloudflared, **kein** `ports:` bei App und DB), Dockerfile Multi-Stage, `USER node`, Foto-Ordner `chown 1000:1000`. Cloudflare-Tunnel, Europa offen, Bot-Abwehr, Ratenbegrenzung auf Login. `pg_dump`-Backup per Timer plus **einmal echt durchgespieltem Rückspielweg**. Sicherheitsabnahme (Kapitel 12), Kamera-Abnahme auf iPad und Android, `docs/BEDIENUNG.md`, `CLAUDE.md`, Landkarten-Zeile |
+| **AP10** | *(tatsächlich gebaut als AP11 und AP13; AP10 wurde die Benutzerverwaltung)* **Deployment & Abnahme.** Compose (postgres + app + caddy, **kein** `ports:` bei App und DB), Dockerfile Multi-Stage, `USER node`, Foto-Ordner `chown 1000:1000`. Cloudflare-Tunnel, Europa offen, Bot-Abwehr, Ratenbegrenzung auf Login. `pg_dump`-Backup per Timer plus **einmal echt durchgespieltem Rückspielweg**. Sicherheitsabnahme (Kapitel 12), Kamera-Abnahme auf iPad und Android, `docs/BEDIENUNG.md`, `CLAUDE.md`, Landkarten-Zeile |
 
 **Reihenfolge.** AP1 steht allein. AP2–AP5 sind Fundament ohne sichtbares Ergebnis — die Absicherung (AP3) kommt **vor** der ersten Fachfunktion, weil sie nachträglich einzuziehen erfahrungsgemäß nie sauber gelingt. **Nach AP7 ist die App echt benutzbar** und sollte im Alltag mitlaufen, während AP8–AP9 nachkommen. AP10 gern vorziehen, sobald etwas Vorzeigbares steht: die Kamera braucht ohnehin HTTPS.
 
@@ -606,7 +622,7 @@ Vier Dienste in einem internen Bridge-Netz. **Weder `app` noch `postgres` haben 
 
 ### Erreichbarkeit
 
-**Cloudflare Tunnel:** `cloudflared` baut eine **ausgehende** Verbindung auf. Es gibt damit **keinen offenen Port** am Router, den jemand scannen könnte — der Mini-PC ist von außen unsichtbar und trotzdem über Ihre Domain erreichbar, mit gültigem Zertifikat (Voraussetzung für die Kamera). Im Dashboard zusätzlich: Herkunftsfilter mit **ganz Europa offen**, Bot-Abwehr, Ratenbegrenzung auf `/api/auth/login`.
+~~**Cloudflare Tunnel:**~~ **Entfallen** (2026-08-21). Stattdessen **Caddy** als einziger Eingang: Er holt das Zertifikat selbst — von Let's Encrypt, wenn eine öffentliche Domain samt Portfreigabe (80/443) vorhanden ist, sonst stellt er eines für den Betrieb im Büro-Netz aus. Das gültige Zertifikat bleibt Voraussetzung für die Kamera. Was mit dem Tunnel wegfällt: Der Mini-PC ist beim Weg über das Internet **nicht mehr unsichtbar**, sein Port 443 ist scanbar. Die Anmeldung dahinter ist darauf ausgelegt (siehe oben), aber die Angriffsfläche ist größer als mit Tunnel oder VPN.
 
 ### Sicherung
 

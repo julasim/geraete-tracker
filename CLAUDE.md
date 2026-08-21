@@ -26,7 +26,7 @@ wsl -d Ubuntu-24.04 -- docker start tracker-db   # Datenbank hoch
 npm run db:migrate                                # Schema aktuell halten
 npm run benutzer:anlegen -- --name <name> --rolle verwaltung
 npm run build && node dist/index.js               # läuft auf :3000
-npm test                                          # 323 Tests
+npm test                                          # 338 Tests
 node scripts/rauchtest.mjs <name> <passwort>      # Anmeldung, gegen die laufende App
 node scripts/durchlauf.mjs <name> <passwort>      # Büro-Weg: anlegen, etikettieren
 node scripts/durchlauf-buchen.mjs <name> <pw>     # Baustellen-Weg: scannen, buchen
@@ -145,10 +145,9 @@ idempotent; der Produktionsstart bricht bei zu kurzem `JWT_SECRET` mit Exit-Code
 `Secure; HttpOnly; SameSite=Strict`; die Ignorierliste hält `.env`, `daten/`,
 `dist/` und `.claude/` draußen; im Paket liegt kein Geheimnis.
 
-**Noch nicht gebaut:** Der Betriebsweg. `.env.example` und `docs/PLAN.md`
-sprechen von `docker-compose.yml`, Dockerfile, Caddy und Cloudflare-Tunnel —
-**davon existiert nichts**. Das ist das nächste Arbeitspaket, nicht ein
-vergessener Rest.
+*Der letzte Absatz dieses Abschnitts lautete bis zum 2026-08-19: „Noch nicht
+gebaut: Der Betriebsweg … davon existiert nichts." Das ist mit AP11 und AP13
+erledigt — Dockerfile, Compose, Caddy, Sicherung und Rückspielweg stehen.*
 
 ## Größenordnung (bestimmt fast alle Entwurfsentscheidungen)
 

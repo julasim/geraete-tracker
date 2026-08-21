@@ -160,7 +160,8 @@ src/          Server: api/ (Routen), data/ (Datenbankzugriff),
               mitkompiliert, damit sie auch im Container zur Verfügung stehen)
 web/          Vue-3-Oberfläche (mobile-first, Navigation unten)
 tests/        338 Tests (Vitest)
-docs/         BETRIEB.md (Mini-PC), BEDIENUNG.md (Benutzer und Rollen),
+caddy/        Caddyfile — der Eingang: TLS und Weiterleitung
+docs/         BETRIEB.md (Mini-PC), BEDIENUNG.md (Etiketten, Benutzer, Rollen),
               PLAN.md, scanner-abnahme.md
 scripts/      Durchläufe gegen die laufende App, Sicherung, Rückspielweg
 ```
