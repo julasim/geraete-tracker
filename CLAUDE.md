@@ -165,8 +165,8 @@ komplett geladen und im Browser gefiltert.
 
 Node 24 · TypeScript ESM strict · **Hono 4** · **PostgreSQL 16** über **postgres.js**
 (kein ORM) · Vue 3.5 + Vite + Pinia + Tailwind v4 · Vitest · Docker Compose
-(app + postgres, cloudflared als optionales Profil — kein Caddy nötig, die
-Anwendung liefert Oberfläche und API selbst aus).
+(caddy + app + postgres — die Anwendung liefert Oberfläche und API selbst
+aus, Caddy macht nur TLS und Weiterleitung).
 
 Geerbt von `../patio` — gleiche Konventionen, damit nichts Neues zu lernen ist.
 Drei bewusste Abweichungen: JWT im **httpOnly-Cookie** statt localStorage ·
@@ -175,10 +175,23 @@ Drei bewusste Abweichungen: JWT im **httpOnly-Cookie** statt localStorage ·
 
 ## Betrieb
 
-Mini-PC im Büro, erreichbar über eine öffentliche Domain per **Cloudflare Tunnel**
-(keine Portfreigabe am Router). Das echte HTTPS-Zertifikat ist **technische
-Voraussetzung**: `getUserMedia()` gibt die Kamera nur im *secure context* frei —
-ein selbstsigniertes Zertifikat reicht nicht, Safari verweigert dann die Kamera.
+Mini-PC im Büro. **Kein Cloudflare-Tunnel** (Julius' Entscheidung vom
+2026-08-21) — stattdessen **Caddy** als einziger Eingang, der das Zertifikat
+selbst holt und erneuert. Zwei Wege, beide in [`docs/BETRIEB.md`](docs/BETRIEB.md):
+
+* **Aus dem Internet:** Portfreigabe 80/443 am Router, DynDNS-Adresse,
+  Let's-Encrypt-Zertifikat. Läuft in jedem Browser ohne Zusatz-App.
+* **Nur im Büro-Netz:** `TLS_MODUS=tls internal`, Caddy stellt selbst aus.
+  Dann muss sein Wurzelzertifikat einmalig auf jedes Gerät.
+
+Das echte HTTPS-Zertifikat ist **technische Voraussetzung**: `getUserMedia()`
+gibt die Kamera nur im *secure context* frei.
+
+*Korrektur zu einer früheren Fassung dieser Datei: Ein selbstsigniertes
+Zertifikat reicht sehr wohl — aber nur, wenn es auf dem Gerät als
+vertrauenswürdig eingerichtet wird. Auf dem iPad braucht das einen zweiten
+Schritt (Einstellungen → Info → Zertifikatsvertrauenseinstellungen), der
+gern übersehen wird; ohne ihn bleibt die Kamera gesperrt.*
 
 ## Entscheidungen, die man kennen muss
 
@@ -347,8 +360,11 @@ Buchung, die die Person erfasst hat.
 ## AP11 — Docker-Paket für den Mini-PC (2026-08-19)
 
 Zweistufiges `Dockerfile` (bauen / laufen), `docker-compose.yml` mit App und
-Postgres, Cloudflare-Tunnel als optionales Profil, Sicherung und Rückspielweg
-als Skripte. Anleitung: [`docs/BETRIEB.md`](docs/BETRIEB.md).
+Postgres, Sicherung und Rückspielweg als Skripte. Anleitung:
+[`docs/BETRIEB.md`](docs/BETRIEB.md).
+
+*Der Cloudflare-Tunnel, den dieses Paket zunächst als optionales Profil
+enthielt, ist am 2026-08-21 wieder entfallen — siehe AP13.*
 
 **Der Fund, der das Paket sonst unbrauchbar gemacht hätte:** `scripts/` wird
 von `tsc` **nicht** gebaut (`include: ["src/**/*.ts"]`). Im Container hätte es
@@ -460,6 +476,45 @@ ist ein Befund über den Test, nicht über den Code.*
 **Sperrzeit:** `reserviereNummern` und `merkeBereich` schreiben in EINEM Insert.
 Mit einer Schleife über 500 Einzel-Inserts hielten sie die Nummernsperre
 sekundenlang — im Testlauf liefen prompt andere Dateien in Zeitüberschreitungen.
+
+## AP13 — Eigener Eingang statt Tunnel (2026-08-21)
+
+Julius: „wir machen das ohne tunnel". Stattdessen **Caddy** als einziger
+Eingang — er holt und erneuert das Zertifikat selbst, bei öffentlicher Domain
+von Let's Encrypt, im reinen Büro-Netz stellt er eines selbst aus
+(`TLS_MODUS=tls internal`).
+
+**Warum überhaupt ein Proxy:** Ohne gültiges Zertifikat gibt der Browser die
+Kamera nicht frei. Ohne HTTPS gäbe es also keinen Scanner, und die Etiketten
+wären umsonst geklebt.
+
+**Drei Stolpersteine beim Bauen, alle im laufenden Stack gefunden:**
+1. **Eine leere `email`-Zeile lässt Caddy gar nicht erst starten.** Caddys
+   eigene Vorgabe-Schreibweise (`{$VAR:vorgabe}`) hilft nicht: Sie greift nur,
+   wenn die Variable UNGESETZT ist — Compose setzt sie aber immer, notfalls
+   leer. Die ganze Zeile wird deshalb im Compose zusammengebaut
+   (`${ACME_EMAIL:+email ${ACME_EMAIL}}`).
+2. **Dem Sitzungs-Cookie fehlte das `Secure`-Flag.** `.env.example` stand auf
+   `COOKIE_SECURE=false` — richtig für die Entwicklung an `http://localhost`,
+   falsch für jeden, der die Vorlage für den Betrieb kopiert. Die Vorlage gibt
+   jetzt den Betriebsfall vor, die Entwicklung ist die dokumentierte Ausnahme.
+3. **Caddys Verwaltungsschnittstelle (2019) stand im Container-Netz offen.**
+   Über sie ließe sich die Konfiguration im Betrieb austauschen; `admin off`.
+
+**Weitergereicht:** `X-Forwarded-For` und `X-Real-IP`. Ohne sie sähe die
+Anwendung nur die Adresse des Proxys — die Anmeldebremse zählte alle
+Fehlversuche auf EINE Adresse und sperrte beim elften Versuch das ganze Büro
+aus statt eines Rechners.
+
+**Geprüft im laufenden Stack** (WSL, frischer Klon): drei Container gesund ·
+HTTPS liefert die Anwendung aus · HTTP wird mit 308 auf HTTPS umgeleitet ·
+Zertifikat von Caddys lokaler CA, zehn Jahre gültig · Anmeldung über HTTP/2
+mit `Secure; HttpOnly; SameSite=Strict` · Rauchtest im Container grün ·
+Datenbank ohne Host-Port, Anwendung nur auf 127.0.0.1, nach außen offen ist
+allein Caddy (80/443).
+
+**Offen und nur vor Ort prüfbar:** das Let's-Encrypt-Zertifikat (braucht die
+echte Domain samt Portfreigabe) und die Kamera-Abnahme am Etikett.
 
 ## Nächster Schritt
 

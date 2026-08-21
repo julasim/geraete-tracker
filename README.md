@@ -11,17 +11,18 @@ Ohne Kamera geht es genauso: Nummer eintippen.
 
 ## Auf dem Mini-PC betreiben (Docker)
 
-Der Weg für den Echtbetrieb — zwei Container, keine Node-Installation nötig:
+Der Weg für den Echtbetrieb — drei Container (Eingang, Anwendung, Datenbank),
+keine Node-Installation nötig:
 
 ```bash
 git clone <repo-adresse> geraete-tracker
 cd geraete-tracker
-cp .env.example .env      # POSTGRES_PASSWORD und JWT_SECRET setzen!
+cp .env.example .env      # POSTGRES_PASSWORD, JWT_SECRET und DOMAIN setzen!
 docker compose up -d --build
 docker compose exec app node dist/werkzeuge/benutzer-anlegen.js --name julius --rolle verwaltung
 ```
 
-Vollständig mit Tunnel, Sicherung und Fehlersuche:
+Vollständig mit HTTPS, Sicherung und Fehlersuche:
 **[`docs/BETRIEB.md`](docs/BETRIEB.md)**.
 
 Alles Weitere hier beschreibt die **Entwicklung** auf dem eigenen Rechner.

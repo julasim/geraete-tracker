@@ -1,23 +1,27 @@
 # Betrieb auf dem Mini-PC
 
-Der Geräte-Tracker läuft als zwei Docker-Container: die Anwendung und ihre
-Datenbank. Alles Weitere — Weboberfläche, API, Etikettendruck — steckt in der
-Anwendung; es braucht keinen zusätzlichen Webserver.
+Der Geräte-Tracker läuft als drei Docker-Container: der Eingang (Caddy), die
+Anwendung und ihre Datenbank. Weboberfläche, API und Etikettendruck stecken
+alle in der Anwendung.
 
 ```
-      Internet (Cloudflare Tunnel, HTTPS)
+          Handy · iPad (HTTPS, Port 443)
                     │
+            ┌───────▼────────┐
+            │  tracker-caddy │  einziger Eingang, holt das Zertifikat selbst
+            └───────┬────────┘  80 leitet auf 443 um
+                    │  internes Docker-Netz
             ┌───────▼────────┐
             │  tracker-app   │  Anwendung + Oberfläche, Port 3000
             └───────┬────────┘  läuft als "node" (uid 1000), nicht als root
-                    │  internes Docker-Netz
+                    │           horcht nur auf 127.0.0.1
             ┌───────▼────────┐
             │tracker-postgres│  KEIN Port nach außen
             └────────────────┘
 ```
 
-Ohne Tunnel ist die Anwendung nur auf dem Mini-PC selbst erreichbar
-(`127.0.0.1:3000`) — bewusst, siehe „Nur im Büro-Netz" weiter unten.
+Nur Caddy ist von außen erreichbar. Die Anwendung selbst horcht auf
+`127.0.0.1` — für Fehlersuche und die Prüfläufe auf dem Mini-PC.
 
 ---
 
@@ -40,8 +44,9 @@ cd geraete-tracker
 cp .env.example .env
 ```
 
-In der `.env` **müssen** zwei Werte gesetzt werden — beide sind Geheimnisse
-und dürfen nirgends sonst auftauchen:
+In der `.env` **müssen** drei Dinge stimmen: die beiden Geheimnisse (sie
+dürfen nirgends sonst auftauchen) und die Adresse, unter der die Anwendung
+erreichbar sein soll (`DOMAIN`, siehe „Erreichbar machen").
 
 ```bash
 # Beide Zeilen erzeugen einen Wert, den man einfach hineinkopiert:
@@ -68,6 +73,7 @@ Der erste Bau dauert ein paar Minuten. Danach:
 
 ```bash
 docker compose ps
+# caddy      Up
 # app        Up (healthy)
 # postgres   Up (healthy)
 ```
@@ -95,42 +101,96 @@ docker compose exec app node dist/werkzeuge/pruefe-schema.js
 
 ## Erreichbar machen
 
-### Aus dem Internet: Cloudflare Tunnel
+Beide Wege liefern echtes HTTPS. Das ist keine Kür: Ohne gültiges Zertifikat
+gibt der Browser die **Kamera nicht frei**, und der Barcode-Scanner ist tot.
 
-Keine Portfreigabe am Router, keine feste IP-Adresse nötig — der Tunnel baut
-die Verbindung von innen nach außen auf.
+### A — Aus dem Internet (Baustelle, unterwegs)
 
-1. Im Cloudflare-Zero-Trust-Dashboard einen Tunnel anlegen und das **Token**
-   kopieren.
-2. Als Ziel (**Public Hostname**) die Domain eintragen, dahinter den Dienst
-   `http://app:3000` — der Dienstname aus dem Compose, **nicht** `localhost`:
-   Aus Sicht des Tunnel-Containers wäre `localhost` er selbst.
-3. Token in die `.env`: `CLOUDFLARE_TUNNEL_TOKEN=…`
-4. Starten:
+Der übliche Fall: Die Leute stehen auf der Baustelle, nicht im Büro-WLAN.
+
+**1. Domain und DNS.** Eine Subdomain auf die Internet-Adresse des Anschlusses
+zeigen lassen, etwa `geraete.meinefirma.at`. Wechselt die Adresse regelmäßig
+(bei den meisten Anschlüssen der Fall), einen DynDNS-Dienst dazwischenschalten
+— viele Router bringen einen mit.
+
+**2. Portfreigabe am Router.** Port **443** und **80** auf den Mini-PC.
+Port 80 wird nur gebraucht, damit Let's Encrypt das Zertifikat ausstellen kann;
+Caddy leitet dort alles auf HTTPS um.
+
+**3. `.env` ausfüllen:**
 
 ```bash
-docker compose --profile tunnel up -d
+DOMAIN=geraete.meinefirma.at
+ACME_EMAIL=julius@sima.or.at
+TLS_MODUS=
+COOKIE_SECURE=true
 ```
 
-**`COOKIE_SECURE=true` muss dann gesetzt sein** (Vorgabe). Cloudflare liefert
-echtes HTTPS — und das ist nicht nur eine Frage der Verschlüsselung: Ohne
-gültiges Zertifikat gibt der Browser die **Kamera nicht frei**, und der
-Scanner ist tot. Ein selbstsigniertes Zertifikat reicht dafür nicht.
+`TLS_MODUS` bleibt **leer** — das ist das Zeichen für „echtes Zertifikat holen".
 
-### Nur im Büro-Netz
+**4. Starten.** Beim ersten Aufruf holt Caddy das Zertifikat, das dauert ein
+paar Sekunden:
 
-Ohne Tunnel horcht die Anwendung nur auf `127.0.0.1`. Wer sie im WLAN
-erreichen will, ändert im `docker-compose.yml`:
-
-```yaml
-    ports:
-      - "3000:3000"        # statt "127.0.0.1:3000:3000"
+```bash
+docker compose up -d --build
+docker compose logs -f caddy      # "certificate obtained successfully"
 ```
 
-Dann steht sie unter `http://<mini-pc-ip>:3000` — **unverschlüsselt**. Damit
-funktioniert die Kamera nicht (kein *secure context*), Anmeldedaten gehen
-im Klartext durchs Netz, und `COOKIE_SECURE` muss auf `false`. Für ein paar
-Minuten Fehlersuche in Ordnung, als Dauerlösung nicht.
+Danach läuft die Anwendung unter `https://geraete.meinefirma.at` in jedem
+Browser, ohne Warnung und ohne Zusatz-App auf den Handys.
+
+> **Was Sie sich damit einhandeln:** Der Mini-PC ist aus dem Internet
+> erreichbar. Die Anwendung ist darauf ausgelegt — Standard ist gesperrt,
+> argon2id mit nachgemessenen 58 ms je Versuch, Bremse ab dem dritten
+> Fehlversuch, Kontosperre nach zehn. Trotzdem gilt: Halten Sie die Fassung
+> aktuell, und vergeben Sie keine schwachen Passwörter. Wer das Restrisiko
+> nicht will, nimmt Weg B und ein VPN.
+
+### B — Nur im Büro-Netz
+
+Ohne Portfreigabe, ohne Internet, ohne Domain. Dafür ist die Anwendung
+außerhalb des Firmen-WLANs nicht erreichbar.
+
+**1. `.env`:**
+
+```bash
+DOMAIN=tracker.local
+TLS_MODUS=tls internal
+COOKIE_SECURE=true
+```
+
+**2. Namen auflösbar machen.** Entweder einen Eintrag im Router
+(`tracker.local` → IP des Mini-PCs) oder in der Hosts-Datei jedes Geräts.
+
+**3. Das Wurzelzertifikat auf jedes Gerät.** Caddy stellt sein eigenes
+Zertifikat aus. Damit iPad und Handy es ohne Warnung akzeptieren — und die
+Kamera freigeben — muss Caddys Wurzelzertifikat einmalig installiert werden:
+
+```bash
+docker compose exec caddy cat /data/caddy/pki/authorities/local/root.crt > tracker-wurzel.crt
+```
+
+Diese Datei (rund 600 Byte, zehn Jahre gültig) auf die Geräte bringen, etwa
+per Mail oder USB-Stick:
+
+- **iPhone / iPad:** Datei öffnen → Profil installieren → dann
+  **Einstellungen → Allgemein → Info → Zertifikatsvertrauenseinstellungen**
+  und dort den Schalter für „Caddy Local Authority" umlegen. *Dieser zweite
+  Schritt wird gern vergessen — ohne ihn bleibt die Kamera gesperrt.*
+- **Android:** Einstellungen → Sicherheit → Verschlüsselung → Zertifikat
+  installieren → CA-Zertifikat.
+- **Windows:** Doppelklick → Installieren → Lokaler Computer →
+  Vertrauenswürdige Stammzertifizierungsstellen.
+
+Danach zeigt der Browser `https://tracker.local` ohne Warnung, und der
+Scanner funktioniert.
+
+### Was nicht geht
+
+**Ohne HTTPS.** Über `http://<ip>:3000` läuft die Anwendung zwar, aber der
+Browser gibt die Kamera nicht frei — es bleibt die Handeingabe. Außerdem
+gingen die Anmeldedaten im Klartext durchs Netz. Für zehn Minuten Fehlersuche
+in Ordnung, als Dauerlösung nicht.
 
 ---
 
@@ -256,6 +316,7 @@ sudo chown -R 1000:1000 /pfad/zum/ordner
 |---|---|
 | Datenbank | Docker-Volume `geraete-tracker_datenbank` |
 | Fotos und PDFs | Docker-Volume `geraete-tracker_fotos` |
+| Zertifikate | Docker-Volume `geraete-tracker_caddy_daten` |
 | Geheimnisse | `.env` im Projektordner (`chmod 600`) |
 | Sicherungen | `./sicherung/` oder `$ZIEL` |
 

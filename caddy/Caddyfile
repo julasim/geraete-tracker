@@ -14,8 +14,21 @@
 
 {
 	# Für Let's Encrypt: Bei Problemen mit dem Zertifikat kommt die Mail
-	# hierher (Ablauf, Sperrung). Leer lassen geht auch.
-	email {$ACME_EMAIL}
+	# hierher (Ablauf, Sperrung).
+	#
+	# Hier steht die GANZE Zeile in einer Variablen ("email x@y" oder nichts),
+	# zusammengesetzt im docker-compose.yml. Der Grund: Eine leere
+	# email-Zeile lässt Caddy gar nicht erst starten, und Caddys eigene
+	# Vorgabe-Schreibweise greift nur, wenn die Variable UNGESETZT ist —
+	# Compose setzt sie aber immer, notfalls leer. Beim Bauen genau so
+	# gestolpert.
+	{$ACME_ZEILE}
+
+	# Caddys Verwaltungsschnittstelle (Port 2019) wird hier nicht gebraucht.
+	# Sie ist zwar nur im internen Docker-Netz erreichbar, aber über sie
+	# ließe sich die gesamte Konfiguration im laufenden Betrieb austauschen —
+	# das muss nicht offenstehen, nur weil es die Vorgabe ist.
+	admin off
 
 	# Caddy schreibt sein Protokoll nach stdout — dort holt es docker ab.
 	log {

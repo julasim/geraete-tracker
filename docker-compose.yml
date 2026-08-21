@@ -83,7 +83,9 @@ services:
     restart: unless-stopped
     environment:
       DOMAIN: ${DOMAIN:?In der .env fehlt DOMAIN (z. B. geraete.meinefirma.at oder tracker.local)}
-      ACME_EMAIL: ${ACME_EMAIL:-}
+      # Ergibt "email julius@..." wenn ACME_EMAIL gesetzt ist, sonst nichts.
+      # Eine leere email-Zeile im Caddyfile verhindert den Start.
+      ACME_ZEILE: ${ACME_EMAIL:+email ${ACME_EMAIL}}
       # Leer = Let's Encrypt. "tls internal" = Caddy stellt selbst aus,
       # für den Betrieb ohne öffentliche Adresse.
       TLS_MODUS: ${TLS_MODUS:-}
