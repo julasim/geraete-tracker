@@ -34,6 +34,7 @@ node scripts/durchlauf-pflege.mjs <name> <pw>     # Fotos, Prüfungen, Schäden,
 node scripts/durchlauf-erfassung.mjs <name> <pw>  # Anlegen, Export, Excel-Runde, Import
 node scripts/beispieldaten.mjs <name> <pw>        # Bestand zum Ansehen
 npm run pruefe:schema                             # 23 Schutzregeln der DB
+npm run lint                                      # ESLint über Server UND Oberfläche
 ```
 
 Die Oberfläche liegt unter **http://localhost:3000** — derselbe Prozess liefert
@@ -515,6 +516,37 @@ allein Caddy (80/443).
 **Offen und nur vor Ort prüfbar:** das Let's-Encrypt-Zertifikat (braucht die
 echte Domain samt Portfreigabe) und die Kamera-Abnahme am Etikett.
 
+## AP14 — ESLint (2026-08-21)
+
+Das Projekt hatte als einziges im Workspace keine statische Prüfung. Jetzt
+ESLint 10 mit flat config wie in `../patio`, erweitert um die Vue-Oberfläche
+(dort größer als der Server): `npm run lint` über `src/`, `tests/`,
+`scripts/` und `web/src/`.
+
+**Neun Befunde beim ersten Lauf, zwei davon echte Fallen:**
+
+1. **Ein unsichtbares BOM stand im Quelltext** — in `domain-csv.test.ts` und
+   in `durchlauf-erfassung.mjs`. Der Test prüfte damit genau das Richtige,
+   aber niemand konnte sehen, was da steht; ein Kopiervorgang hätte es
+   stillschweigend verschluckt, und der Test hätte danach nichts mehr
+   geprüft. Jetzt als `﻿` geschrieben — gleiche Wirkung, sichtbar.
+   *In diesem Projekt ist schon zweimal etwas an unsichtbaren Zeichen
+   gescheitert (Escape-Sequenzen in Heredocs, CRLF im Container).*
+2. **`web/src/api.ts` hatte eine Zuweisung, die nie gelesen wurde.**
+   Harmlos, aber sie täuschte einen Ausgangswert vor, den es nicht gab.
+
+Der Rest: fünf tote Importe und ein `let`, das ein `const` sein wollte.
+Nebenbei fiel eine Doppelung auf — die Nummernformatierung stand in
+`domain/barcode.ts` **und** in `data/nummern.ts`. Jetzt gibt es `alsNummer()`
+an einer Stelle, und beide rufen sie.
+
+**Gegengeprüft**, dass die Prüfung überhaupt greift: eine Datei mit `any`,
+totem Bezeichner und leerem catch untergeschoben — drei Befunde, danach
+wieder entfernt.
+
+Formatierungsregeln sind abgeschaltet (`eslint-config-prettier`): Zwei
+Werkzeuge, die sich über Zeilenumbrüche streiten, kosten nur Zeit.
+
 ## Nächster Schritt
 
 **Kamera-Abnahme am echten Etikett** mit iPad und Android — braucht die
@@ -528,7 +560,8 @@ Aufkleber drucken.
 
 - Deutsch in Doku, Kommentaren, UI und Commit-Messages; englische Bezeichner im Code,
   wo üblich. Fachbegriffe der Domäne (`geraete`, `buchungen`, `standorte`) auf Deutsch.
-- Vor jedem Commit: `npx tsc --noEmit`, `npm test`, ab Frontend zusätzlich `npx vue-tsc`.
+- Vor jedem Commit: `npx tsc --noEmit`, `npm run lint`, `npm test`, ab Frontend
+  zusätzlich `npx vue-tsc`.
 - **Kein Push ohne ausdrückliche Aufforderung.** `.claude/` und `.env` nie committen.
 - Migrationen forward-only, nummeriert, idempotent. Buchungen sind append-only —
   die Datenbank verweigert `UPDATE` und `DELETE` per Rule.

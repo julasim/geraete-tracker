@@ -138,7 +138,7 @@ await schritt("Datei wie in Excel bearbeiten und wieder einlesen", async () => {
   // Bezeichnung ändern, Hersteller leeren (darf NICHTS löschen)
   const geaendert = exportiert
     .replace(`${marke} Rüttelplatte;Wacker Neuson`, `${marke} Rüttelplatte 600 kg;`)
-    .replace(/﻿/, ""); // Excel schreibt das BOM neu, hier egal
+    .replace(/\uFEFF/, ""); // Excel schreibt das BOM neu, hier egal
 
   const vorschau = await anfrage("/api/import/geraete/pruefen", {
     methode: "POST",

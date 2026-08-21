@@ -54,7 +54,7 @@ function entpackterText(pdf: Buffer): string {
 
 let admin: Sitzung;
 let mitarbeiter: Sitzung;
-let geraetIds: string[] = [];
+const geraetIds: string[] = [];
 
 beforeAll(async () => {
   await raeumeTestdatenAuf();

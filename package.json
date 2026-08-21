@@ -20,7 +20,9 @@
     "pruefe:schema": "tsx src/werkzeuge/pruefe-schema.ts",
     "build:server": "tsc && node scripts/kopiere-migrationen.mjs",
     "dev:web": "npm --prefix web run dev",
-    "postinstall": "npm --prefix web install"
+    "postinstall": "npm --prefix web install",
+    "lint": "eslint src/ tests/ scripts/ web/src/",
+    "lint:fix": "eslint src/ tests/ scripts/ web/src/ --fix"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.9",
@@ -34,11 +36,17 @@
     "zod": "^4.1.13"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^24.10.1",
     "@types/pdfkit": "^0.17.6",
+    "eslint": "^10.9.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-vue": "^10.10.0",
     "tsx": "^4.20.7",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.10"
+    "typescript-eslint": "^8.67.0",
+    "vitest": "^4.0.10",
+    "vue-eslint-parser": "^10.4.1"
   }
 }

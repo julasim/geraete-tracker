@@ -4,7 +4,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db, schliesseDb } from "../src/db/client.js";
-import { legeKontoAn, meldeAn, entsperre, raeumeKontoAuf, TEST_PASSWORT } from "./helpers/konten.js";
+import { legeKontoAn, meldeAn, entsperre, raeumeKontoAuf } from "./helpers/konten.js";
 import type { TestKonto } from "./helpers/konten.js";
 
 let konto: TestKonto;

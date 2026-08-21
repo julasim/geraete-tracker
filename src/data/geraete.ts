@@ -7,7 +7,6 @@
  * mehr die Wahrheit, sondern eine Erzählung.
  */
 
-import type postgres from "postgres";
 import { db } from "../db/client.js";
 import { KonfliktFehler, NichtGefunden, RegelFehler } from "../api/fehler.js";
 import { codeArt, normalisiere, suchVarianten } from "../domain/barcode.js";

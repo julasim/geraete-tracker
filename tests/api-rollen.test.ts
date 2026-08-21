@@ -9,7 +9,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db, schliesseDb } from "../src/db/client.js";
 import { app } from "../src/api/server.js";
-import { COOKIE_NAME } from "../src/api/auth.js";
 import { hashePasswort } from "../src/domain/passwort.js";
 
 const PASSWORT = "Kranfahrt-Ziegel-Winter-7742";

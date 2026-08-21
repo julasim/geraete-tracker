@@ -25,7 +25,7 @@ import {
   loescheSchlagwort,
 } from "../../data/stammdaten.js";
 import { EingabeFehler } from "../fehler.js";
-import { pfadId, pfadText } from "../pfad.js";
+import { pfadId } from "../pfad.js";
 
 export const stammdatenRouten = new Hono<AppEnv>();
 

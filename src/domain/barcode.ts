@@ -94,7 +94,19 @@ export function suchVarianten(roh: string): string[] {
 export function naechsteNummer(hoechste: string | null, stellen = 5): string {
   const zahl = hoechste ? Number(normalisiere(hoechste)) : 10_000;
   const naechste = (Number.isFinite(zahl) ? zahl : 10_000) + 1;
-  return String(naechste).padStart(stellen, "0");
+  return alsNummer(naechste, stellen);
+}
+
+/**
+ * Eine Zahl in der Schreibweise einer Inventarnummer.
+ *
+ * Steht hier und nicht bei der Vergabe, damit es nur EINE Stelle gibt, die
+ * über führende Nullen entscheidet. Die Vergabe überspringt belegte Nummern
+ * und kann deshalb nicht einfach `naechsteNummer` in einer Schleife rufen —
+ * sie zählt selbst hoch und formatiert am Ende hiermit.
+ */
+export function alsNummer(zahl: number, stellen = 5): string {
+  return String(zahl).padStart(stellen, "0");
 }
 
 /** Die nächste freie Lagerplatz-Kennung, z.B. P-0001 → P-0002. */

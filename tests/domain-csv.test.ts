@@ -27,8 +27,8 @@ describe("Zeichensatz", () => {
 
   it("entfernt ein BOM am Anfang", () => {
     // Excel schreibt es, und ohne Entfernen hieße die erste Spalte
-    // "﻿Inventarnummer" — der Import fände sie nicht.
-    expect(alsText(bytes("﻿Inventarnummer"))).toBe("Inventarnummer");
+    // "<BOM>Inventarnummer" — der Import fände sie nicht.
+    expect(alsText(bytes("\uFEFFInventarnummer"))).toBe("Inventarnummer");
   });
 
   it("erkennt eine Datei aus Excel (Windows-1252) an den Umlauten", () => {

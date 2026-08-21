@@ -67,10 +67,11 @@ async function anfrage<T>(pfad: string, init: RequestInit = {}): Promise<T> {
   if (antwort.status === 204) return undefined as T;
 
   const text = await antwort.text();
-  let daten: unknown = null;
+  let daten: unknown;
   try {
     daten = text ? JSON.parse(text) : null;
   } catch {
+    // Kein JSON — etwa eine HTML-Fehlerseite vom Proxy davor.
     daten = null;
   }
 

@@ -15,7 +15,7 @@
 
 import type postgres from "postgres";
 import { db } from "../db/client.js";
-import { naechsteNummer } from "../domain/barcode.js";
+import { alsNummer } from "../domain/barcode.js";
 
 /** Dieselbe Sperre wie bei der Geräteanlage — die Vergabe ist EIN Nadelöhr. */
 export const SPERRE_NUMMERNKREIS = 7_319_777;
@@ -85,7 +85,7 @@ async function naechsteFreie(tx: postgres.TransactionSql, anzahl: number): Promi
   while (neu.length < anzahl) {
     kandidat++;
     if (belegt.has(kandidat)) continue;
-    neu.push(String(kandidat).padStart(stellen, "0"));
+    neu.push(alsNummer(kandidat, stellen));
   }
   return neu;
 }

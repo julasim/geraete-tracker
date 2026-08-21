@@ -111,6 +111,13 @@ Und die Datenbank selbst:
 npm run pruefe:schema    # 23 Schutzregeln am laufenden Schema
 ```
 
+Statische Prüfung von Server, Tests und Oberfläche:
+
+```bash
+npm run lint             # ESLint über src/, tests/, scripts/, web/src/
+npm run lint:fix         # was sich von selbst beheben lässt
+```
+
 Zum Ansehen mit Inhalt: `node scripts/beispieldaten.mjs <name> <passwort>`
 legt 12 Geräte, 4 Orte, 4 Regale und ein paar Buchungen an.
 
