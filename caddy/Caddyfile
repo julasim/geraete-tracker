@@ -1,0 +1,58 @@
+# Der einzige Eingang von außen.
+#
+# Caddy holt und erneuert das HTTPS-Zertifikat von selbst. Das ist keine
+# Kosmetik: Ohne gültiges Zertifikat gibt der Browser die Kamera nicht frei
+# (getUserMedia braucht einen "secure context") — der Barcode-Scanner wäre
+# tot, und die Etiketten wären umsonst geklebt.
+#
+# Welche Adresse hier steht, kommt aus der .env:
+#
+#   DOMAIN=geraete.meinefirma.at   → echtes Let's-Encrypt-Zertifikat,
+#                                     erreichbar aus dem Internet
+#   DOMAIN=tracker.local           → Caddy stellt selbst eines aus,
+#                                     nur im Büro-Netz (siehe unten)
+
+{
+	# Für Let's Encrypt: Bei Problemen mit dem Zertifikat kommt die Mail
+	# hierher (Ablauf, Sperrung). Leer lassen geht auch.
+	email {$ACME_EMAIL}
+
+	# Caddy schreibt sein Protokoll nach stdout — dort holt es docker ab.
+	log {
+		output stdout
+		format console
+	}
+}
+
+{$DOMAIN} {
+	# Im Büro-Netz gibt es keine öffentlich erreichbare Adresse, also kann
+	# Let's Encrypt auch nichts prüfen. Caddy stellt dann selbst ein
+	# Zertifikat aus; sein Wurzelzertifikat muss einmalig auf jedes iPad
+	# und Handy. Siehe docs/BETRIEB.md.
+	{$TLS_MODUS}
+
+	encode gzip zstd
+
+	# Die Anwendung liefert Oberfläche UND API aus — es braucht nichts
+	# weiter davor. Der Dienstname kommt aus dem Compose, nicht localhost:
+	# Aus Sicht dieses Containers wäre localhost er selbst.
+	reverse_proxy app:3000 {
+		# Damit die Anwendung die echte Adresse des Geräts sieht und nicht
+		# die des Proxys. Ohne das zählt die Anmeldebremse alle Fehlversuche
+		# auf EINE Adresse — und sperrt beim elften Versuch das ganze Büro
+		# aus, statt nur den einen Rechner.
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Real-IP {remote_host}
+	}
+
+	# Die Sicherheits-Kopfzeilen setzt die Anwendung selbst (CSP, Referrer,
+	# Kamera-Freigabe nur für die eigene Seite). Hier kommt nur dazu, was
+	# sie nicht wissen kann: dass sie hinter HTTPS steht.
+	header {
+		# Ein Jahr HTTPS erzwingen. Bewusst OHNE preload: Das ließe sich
+		# nur schwer rückgängig machen, falls die Domain einmal wechselt.
+		Strict-Transport-Security "max-age=31536000"
+		# Verrät sonst, welche Fassung von Caddy läuft.
+		-Server
+	}
+}

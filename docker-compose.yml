@@ -1,12 +1,18 @@
 # Geräte-Tracker auf dem Mini-PC.
 #
-# Zwei Dienste: die Anwendung und ihre Datenbank. Die Datenbank hat bewusst
-# KEIN "ports:" — sie ist nur über das interne Netz erreichbar. Stünde dort
-# ein Port, wäre Postgres im ganzen Büro-WLAN offen.
+# Drei Dienste: der Eingang (Caddy), die Anwendung und ihre Datenbank.
+#
+# Nach außen offen ist NUR Caddy (80/443). Die Anwendung horcht auf
+# 127.0.0.1, die Datenbank auf gar nichts — sie hat bewusst kein "ports:".
+# Stünde dort eines, wäre Postgres im ganzen Büro-WLAN erreichbar.
 #
 #   docker compose up -d --build     starten
 #   docker compose logs -f app       zusehen
 #   docker compose down              anhalten (Daten bleiben)
+#
+# Caddy holt das HTTPS-Zertifikat selbst. Das entscheidet darüber, ob der
+# Barcode-Scanner funktioniert: Ohne gültiges Zertifikat gibt der Browser
+# die Kamera nicht frei.
 
 services:
   app:
@@ -24,7 +30,7 @@ services:
       # Fehlt eines der beiden Geheimnisse, bricht compose sofort mit dieser
       # Meldung ab — besser als ein Container, der in einer Neustartschleife hängt.
       JWT_SECRET: ${JWT_SECRET:?In der .env fehlt JWT_SECRET (mindestens 32 Zeichen)}
-      # Hinter dem Tunnel liegt echtes HTTPS — ohne das kommt kein Cookie an.
+      # Caddy liefert echtes HTTPS — ohne diese Zeile käme kein Cookie an.
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       SESSION_TAGE: ${SESSION_TAGE:-30}
       PASSWORT_MIN_LAENGE: ${PASSWORT_MIN_LAENGE:-12}
@@ -39,10 +45,8 @@ services:
       # Fotos und Anhänge überleben jedes Neubauen des Abbilds.
       - fotos:/data
     ports:
-      # Nur auf dem Mini-PC selbst erreichbar (127.0.0.1), nicht im Netz.
-      # Nach außen geht es ausschließlich über den Tunnel. Wer die App im
-      # Büro-WLAN direkt erreichen will, ändert das auf "3000:3000" — und
-      # weiß dann, dass sie dort unverschlüsselt steht.
+      # Nur auf dem Mini-PC selbst, für Fehlersuche und die Prüfläufe.
+      # Von außen kommt man ausschließlich über Caddy herein.
       - "127.0.0.1:${HOST_PORT:-3000}:3000"
     depends_on:
       postgres:
@@ -68,21 +72,36 @@ services:
       start_period: 30s
     # KEIN ports: — die Datenbank bleibt im internen Netz.
 
-  # Öffentliche Adresse ohne Portfreigabe am Router.
+  # Der Eingang: TLS und Weiterleitung an die Anwendung.
   #
-  # Nur aktiv mit:  docker compose --profile tunnel up -d
-  # Das Token kommt aus dem Cloudflare-Zero-Trust-Dashboard; der Tunnel dort
-  # zeigt auf  http://app:3000  (Dienstname, nicht localhost — aus Sicht des
-  # Tunnel-Containers ist localhost er selbst).
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: tracker-tunnel
+  # Nur dieser Dienst ist von außen erreichbar. Er holt und erneuert das
+  # Zertifikat automatisch — bei einer öffentlichen Domain von Let's Encrypt,
+  # im reinen Büro-Netz stellt er selbst eines aus.
+  caddy:
+    image: caddy:2-alpine
+    container_name: tracker-caddy
     restart: unless-stopped
-    profiles: ["tunnel"]
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    environment:
+      DOMAIN: ${DOMAIN:?In der .env fehlt DOMAIN (z. B. geraete.meinefirma.at oder tracker.local)}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+      # Leer = Let's Encrypt. "tls internal" = Caddy stellt selbst aus,
+      # für den Betrieb ohne öffentliche Adresse.
+      TLS_MODUS: ${TLS_MODUS:-}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Die Zertifikate überleben jeden Neustart. Ohne dieses Volume würde
+      # bei jedem "up" ein neues geholt — Let's Encrypt begrenzt das auf
+      # fünf pro Woche und Domain, danach steht die Anlage.
+      - caddy_daten:/data
+      - caddy_konfig:/config
     depends_on:
       - app
 
 volumes:
   datenbank:
   fotos:
+  caddy_daten:
+  caddy_konfig:
