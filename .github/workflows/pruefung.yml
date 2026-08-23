@@ -1,0 +1,84 @@
+# Die volle Prüfkette bei jedem Push.
+#
+# Warum das hier steht, obwohl nur eine Person am Code arbeitet: Es fängt
+# genau die Fehler, die beim „schnell noch was ändern" entstehen — wenn man
+# den Testlauf abkürzt, weil die Änderung ja klein ist. Der Lauf hier lässt
+# sich nicht abkürzen.
+#
+# Die Testsuite braucht eine echte Datenbank. Sie überspringt Tests NICHT,
+# wenn keine da ist, sondern bricht laut ab (siehe tests/helpers/aufbau.ts) —
+# ein grüner Lauf ohne Datenbank wäre schlimmer als ein roter.
+
+name: Prüfung
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pruefen:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tracker
+          POSTGRES_PASSWORD: tracker
+          POSTGRES_DB: tracker
+        ports:
+          - 5432:5432
+        # Ohne diese Prüfung starten die Tests gegen eine Datenbank, die
+        # noch hochfährt — dieselbe Falle wie im docker-compose.yml.
+        options: >-
+          --health-cmd "pg_isready -U tracker"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://tracker:tracker@127.0.0.1:5432/tracker
+      # Mindestens 32 Zeichen, sonst verweigert die Anwendung den Start.
+      # Ein Wert, der nur hier gilt und nirgends sonst existiert.
+      JWT_SECRET: nur-fuer-die-pruefung-in-der-werkbank-nicht-anderswo
+      COOKIE_SECURE: "false"
+      # Der Abgleich gegen bekannte Passwortlecks geht ins Internet. In der
+      # Prüfung abgeschaltet: Er würde jeden Lauf von einem fremden Dienst
+      # abhängig machen, ohne etwas über den Code auszusagen.
+      LEAK_PRUEFUNG: "false"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      # Installiert Server UND Oberfläche (postinstall).
+      - run: npm ci
+
+      - name: Schema anlegen
+        run: npm run db:migrate
+
+      - name: Statische Prüfung
+        run: npm run lint
+
+      - name: Typen (Server)
+        run: npx tsc --noEmit
+
+      - name: Typen (Oberfläche)
+        run: npm --prefix web run pruefe
+
+      - name: Tests
+        run: npm test
+
+      # Zuletzt, weil er am längsten dauert und die anderen Schritte
+      # schneller sagen, was kaputt ist.
+      - name: Bau
+        run: npm run build
+
+      - name: Schutzregeln am Schema
+        run: npm run pruefe:schema

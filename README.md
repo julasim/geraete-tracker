@@ -92,7 +92,7 @@ API und Web-Anwendung aus.
 npm test
 ```
 
-351 Tests. Zusätzlich sechs Durchläufe **gegen die laufende Anwendung** — die
+357 Tests. Zusätzlich sechs Durchläufe **gegen die laufende Anwendung** — die
 Testsuite läuft im selben Prozess und würde nicht merken, wenn der gebaute
 Server gar nicht startet:
 
@@ -166,7 +166,7 @@ src/          Server: api/ (Routen), data/ (Datenbankzugriff),
               werkzeuge/ (Kontoanlage, Migration, Schemaprüfung — werden
               mitkompiliert, damit sie auch im Container zur Verfügung stehen)
 web/          Vue-3-Oberfläche (mobile-first, Navigation unten)
-tests/        351 Tests (Vitest)
+tests/        357 Tests (Vitest)
 caddy/        Caddyfile — der Eingang: TLS und Weiterleitung
 docs/         BETRIEB.md (Mini-PC), BEDIENUNG.md (Etiketten, Benutzer, Rollen),
               PLAN.md, scanner-abnahme.md

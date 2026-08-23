@@ -4,7 +4,7 @@ Web-Anwendung für Handy und iPad: Baumaschinen mit vorhandenen 1D-Strichcode-Et
 scannen, ausgeben, zurücknehmen — mit lückenloser Historie, wer ein Gerät wann auf
 welche Baustelle gebracht hat.
 
-**Stand: 2026-08-23 — AP1 bis AP15 fertig, als Docker-Paket lauffähig.** Anmelden, scannen, ausgeben,
+**Stand: 2026-08-23 — AP1 bis AP16 fertig, als Docker-Paket lauffähig.** Anmelden, scannen, ausgeben,
 zurücknehmen, umbuchen; Fotos und Dokumente; Prüfungen; Schäden; Zubehör;
 Geräte anlegen und bearbeiten, Import/Export als Tabelle, Etikettendruck;
 **Benutzerverwaltung in der Oberfläche mit frei zusammenstellbaren Rollen.**
@@ -26,7 +26,7 @@ wsl -d Ubuntu-24.04 -- docker start tracker-db   # Datenbank hoch
 npm run db:migrate                                # Schema aktuell halten
 npm run benutzer:anlegen -- --name <name> --rolle verwaltung
 npm run build && node dist/index.js               # läuft auf :3000
-npm test                                          # 351 Tests
+npm test                                          # 357 Tests
 node scripts/rauchtest.mjs <name> <passwort>      # Anmeldung, gegen die laufende App
 node scripts/durchlauf.mjs <name> <passwort>      # Büro-Weg: anlegen, etikettieren
 node scripts/durchlauf-buchen.mjs <name> <pw>     # Baustellen-Weg: scannen, buchen
@@ -598,6 +598,45 @@ zwei Regale einen anderen Bogen ergeben als eines; die Lesbarkeit bleibt
 ausdrücklich der Handprüfung.
 
 **351 Tests** (vorher 338), Lint sauber, alle sechs Durchläufe grün.
+
+## AP16 — Prüfung bei jedem Push, sichtbare Sicherung (2026-08-23)
+
+Zwei Punkte, die nach dem Push nach GitHub möglich bzw. überfällig waren.
+
+**Prüfkette in der Werkbank.** `.github/workflows/pruefung.yml` fährt bei
+jedem Push auf `master` und bei jedem Pull Request: `npm ci`, Migration,
+Lint, beide Typprüfungen, 357 Tests, Bau, Schemaprüfung — gegen einen echten
+Postgres-Dienst.
+
+*Warum überhaupt, bei einer Person am Code:* Es fängt genau die Fehler, die
+beim „schnell noch was ändern" entstehen, wenn man den Testlauf abkürzt.
+Zwei Einstellungen sind dabei bewusst gesetzt: `LEAK_PRUEFUNG=false` (der
+Abgleich gegen bekannte Passwortlecks geht ins Internet und würde jeden Lauf
+von einem fremden Dienst abhängig machen) und ein `JWT_SECRET`, das nur dort
+gilt. Die Testsuite überspringt ohne Datenbank **nichts**, sondern bricht
+laut ab — genau deshalb steht der Postgres-Dienst in der Werkbank.
+
+**Die Sicherung meldet sich, wenn sie scheitert.** Sie lief nachts per cron
+und brach im Fehlerfall still ab; gemerkt hätte man es, wenn man sie braucht.
+Da diese Anwendung bewusst keine Mails verschickt, nimmt die Meldung den
+umgekehrten Weg: `scripts/sicherung.sh` schreibt den Ausgang jedes Laufs nach
+`daten/sicherung-stand.json` (ein `trap ... ERR` fängt auch einen Abbruch
+mitten im Lauf), und die Übersicht zeigt ihn unter *Mehr → Verwaltung →
+Datensicherung* — grün bei „heute gesichert", rot ab drei Tagen, bei einem
+Fehlschlag und wenn noch nie gesichert wurde.
+
+**Warum eine Datei und kein Eintrag in der Datenbank:** Die Sicherung muss
+auch dann noch melden können, wenn genau die Datenbank das Problem ist.
+
+Sichtbar nur mit `benutzer.verwalten` — den Zustand der Anlage geht einen
+Mitarbeiter auf der Baustelle nichts an (geprüft: 403).
+
+**Sechs Tests**, darunter die beiden Fälle, die im Betrieb wirklich
+vorkommen: halbes JSON aus einem abgebrochenen Schreibvorgang und ein
+unbrauchbarer Zeitstempel — beides ergibt „nichts bekannt" statt einer
+Fehlermeldung über eine Nebensache. *Der erste Testlauf schlug fehl, weil die
+Datei aus einem Handtest noch dalag: Aufgeräumt wurde nach jedem Test, nötig
+war es davor.*
 
 ## Nächster Schritt
 

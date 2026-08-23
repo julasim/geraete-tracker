@@ -5,7 +5,7 @@ import { RouterLink, useRouter } from "vue-router";
 import { api } from "@/api";
 import { useAnmeldung } from "@/stores/anmeldung";
 import { useBestand } from "@/stores/bestand";
-import type { FaelligePruefung, OffeneAusgabe } from "@/typen";
+import type { FaelligePruefung, OffeneAusgabe, SicherungsStand } from "@/typen";
 import Kopf from "@/components/Kopf.vue";
 
 const anmeldung = useAnmeldung();
@@ -14,12 +14,32 @@ const router = useRouter();
 
 const offene = ref<OffeneAusgabe[]>([]);
 const pruefungen = ref<FaelligePruefung[]>([]);
+const sicherung = ref<SicherungsStand | null>(null);
+const sicherungGeprueft = ref(false);
 const dunkel = ref(document.documentElement.classList.contains("dunkel"));
 
 const ueberfaellig = computed(() => offene.value.filter((o) => o.ueberfaellig));
 const pruefungUeberfaellig = computed(
   () => pruefungen.value.filter((p) => p.ampel === "ueberfaellig").length,
 );
+
+/**
+ * Wie die letzte Sicherung dasteht.
+ *
+ * Zwei Tage sind die Grenze: Die Sicherung läuft nachts, ein ausgefallener
+ * Lauf ist normal (Rechner aus), zwei hintereinander nicht mehr.
+ */
+const sicherungText = computed(() => {
+  if (!sicherungGeprueft.value) return null;
+  const s = sicherung.value;
+  if (!s) return { text: "Noch nie gesichert", warnung: true };
+  if (s.ausgang === "fehler") {
+    return { text: `Zuletzt fehlgeschlagen (vor ${s.tage_her} Tagen)`, warnung: true };
+  }
+  if (s.tage_her === 0) return { text: "Heute gesichert", warnung: false };
+  if (s.tage_her === 1) return { text: "Gestern gesichert", warnung: false };
+  return { text: `Vor ${s.tage_her} Tagen gesichert`, warnung: s.tage_her > 2 };
+});
 
 onMounted(async () => {
   await bestand.laden();
@@ -32,6 +52,16 @@ onMounted(async () => {
     pruefungen.value = await api.get<FaelligePruefung[]>("/pruefungen/faellig");
   } catch {
     // Ebenso.
+  }
+  if (anmeldung.istVerwaltung) {
+    try {
+      sicherung.value = await api.get<SicherungsStand | null>("/sicherung/stand");
+    } catch {
+      // Ohne Recht oder ohne Server: Dann steht dort nichts, statt etwas
+      // Falsches.
+    } finally {
+      sicherungGeprueft.value = true;
+    }
   }
 });
 
@@ -159,6 +189,22 @@ async function abmelden(): Promise<void> {
                   <div class="pt-zeile__unter">Barcode-Etiketten für neue Geräte</div>
                 </div>
               </button>
+            </li>
+            <li v-if="sicherungText">
+              <div class="pt-zeile pt-zeile--still">
+                <div class="pt-zeile__haupt">
+                  <div class="pt-zeile__titel">Datensicherung</div>
+                  <div class="pt-zeile__unter">
+                    {{ sicherung?.ziel || "Einrichtung siehe docs/BETRIEB.md" }}
+                  </div>
+                </div>
+                <span
+                  class="pt-chip"
+                  :class="sicherungText.warnung ? 'pt-chip--defekt' : 'pt-chip--verfuegbar'"
+                >
+                  {{ sicherungText.text }}
+                </span>
+              </div>
             </li>
             <li v-if="anmeldung.istVerwaltung">
               <button class="pt-zeile" @click="router.push('/benutzer')">

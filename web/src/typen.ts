@@ -254,3 +254,12 @@ export const STATUS_TEXT: Record<GeraetStatus, string> = {
   defekt: "Defekt",
   ausgemustert: "Ausgemustert",
 };
+
+export interface SicherungsStand {
+  ausgang: "erfolg" | "fehler";
+  zeitpunkt: string;
+  stempel: string;
+  ziel: string;
+  meldung: string;
+  tage_her: number;
+}

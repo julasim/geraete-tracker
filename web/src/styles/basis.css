@@ -188,6 +188,15 @@ a {
   background: var(--surface-subtle);
 }
 
+/* Eine Zeile, die nur berichtet. Ohne diese Klasse sähe sie aus wie ein
+   Knopf (Zeigefinger, Hover) und niemand wüsste, warum nichts passiert. */
+.pt-zeile--still {
+  cursor: default;
+}
+.pt-zeile--still:hover {
+  background: none;
+}
+
 .pt-zeile__haupt {
   flex: 1;
   min-width: 0;

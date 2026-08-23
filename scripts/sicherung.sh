@@ -15,6 +15,32 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+# ── Damit ein Fehlschlag nicht still bleibt ─────────────────────────────────
+#
+# Eine Sicherung, die nachts per cron läuft und scheitert, merkt sonst
+# niemand — bis sie gebraucht wird. Es gibt in dieser Anwendung bewusst
+# keinen Mailversand, also nimmt sie den umgekehrten Weg: Der Ausgang jedes
+# Laufs landet als Datei im Datenverzeichnis, und die Anwendung zeigt in der
+# Übersicht, wann zuletzt gesichert wurde. Wer die App öffnet, sieht es.
+STAND_DATEI="${STAND_DATEI:-./daten/sicherung-stand.json}"
+
+schreibeStand() {
+  local ausgang="$1" meldung="$2"
+  mkdir -p "$(dirname "$STAND_DATEI")" 2>/dev/null || return 0
+  cat > "$STAND_DATEI" <<ENDE || true
+{
+  "ausgang": "$ausgang",
+  "zeitpunkt": "$(date -Iseconds)",
+  "stempel": "${STEMPEL:-}",
+  "ziel": "${ZIEL:-}",
+  "meldung": "$meldung"
+}
+ENDE
+}
+
+# Läuft bei jedem Abbruch — egal an welcher Zeile.
+trap 'schreibeStand fehler "Die Sicherung ist abgebrochen. Ausgabe des Laufs prüfen."' ERR
+
 ZIEL="${ZIEL:-./sicherung}"
 BEHALTEN="${BEHALTEN:-14}"
 STEMPEL="$(date +%Y-%m-%d_%H%M)"
@@ -57,5 +83,7 @@ for muster in "datenbank_" "dateien_"; do
     echo "  entfernt (älter als $BEHALTEN Läufe): $(basename "$alt")"
   done
 done
+
+schreibeStand erfolg "Datenbank und Dateien gesichert."
 
 echo "Fertig. Zurückspielen: ./scripts/ruecksicherung.sh $STEMPEL"

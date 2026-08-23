@@ -225,6 +225,31 @@ Unter Windows dasselbe über die Aufgabenplanung.
 
 Aufgehoben werden die letzten 14 Läufe (`BEHALTEN=30` für mehr).
 
+**Diesen Eintrag wirklich anlegen.** Die Skripte allein sichern nichts —
+ohne cron läuft nie eine Sicherung, und das fällt erst auf, wenn eine
+gebraucht wird.
+
+### Sie sehen in der App, ob es geklappt hat
+
+Jeder Lauf hinterlässt seinen Ausgang in `daten/sicherung-stand.json`. Die
+Anwendung liest die Datei und zeigt das Ergebnis unter **Mehr → Verwaltung →
+Datensicherung**:
+
+| Anzeige | Bedeutung |
+|---|---|
+| „Heute gesichert" (grün) | Alles in Ordnung |
+| „Vor 3 Tagen gesichert" (rot) | Der cron-Lauf kommt nicht durch |
+| „Zuletzt fehlgeschlagen" (rot) | Der Lauf ist abgebrochen — `sicherung.log` ansehen |
+| „Noch nie gesichert" (rot) | Es gibt keinen cron-Eintrag |
+
+Das ersetzt die Mail, die diese Anwendung bewusst nicht verschickt: Wer die
+App öffnet, sieht es. Sichtbar ist es nur mit dem Recht
+`benutzer.verwalten` — einen Mitarbeiter auf der Baustelle geht der Zustand
+der Anlage nichts an.
+
+> **Warum eine Datei und kein Eintrag in der Datenbank:** Die Sicherung muss
+> auch dann noch melden können, wenn genau die Datenbank das Problem ist.
+
 **Zurückspielen:**
 
 ```bash

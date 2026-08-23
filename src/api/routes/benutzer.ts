@@ -25,6 +25,7 @@ import {
   loescheRolle,
 } from "../../data/rollen.js";
 import { RECHT_TEXT, rechteNachGruppe, RECHTE } from "../../domain/rechte.js";
+import { letzteSicherung } from "../../data/sicherung.js";
 import { logInfo } from "../../logger.js";
 
 export const benutzerRouten = new Hono<AppEnv>();
@@ -105,6 +106,18 @@ benutzerRouten.post("/benutzer/:id/passwort", darf("benutzer.verwalten"), async 
 });
 
 // ── Rollen ─────────────────────────────────────────────────────────────────
+
+/**
+ * Wann zuletzt gesichert wurde.
+ *
+ * Sitzt bei den Verwaltungsrouten, weil es dieselbe Person angeht: wer
+ * Konten anlegt, kümmert sich auch darum, dass die Daten gesichert sind.
+ * Das Recht ist `benutzer.verwalten` — ein Mitarbeiter auf der Baustelle
+ * kann damit nichts anfangen und soll den Zustand der Anlage nicht sehen.
+ */
+benutzerRouten.get("/sicherung/stand", darf("benutzer.verwalten"), async (c) =>
+  c.json(await letzteSicherung()),
+);
 
 /** Der Rechte-Katalog, gruppiert — die Vorlage für die Häkchenliste. */
 benutzerRouten.get("/rechte", darf("benutzer.verwalten"), (c) =>
