@@ -22,12 +22,19 @@ cd "$(dirname "$0")/.."
 # keinen Mailversand, also nimmt sie den umgekehrten Weg: Der Ausgang jedes
 # Laufs landet als Datei im Datenverzeichnis, und die Anwendung zeigt in der
 # Übersicht, wann zuletzt gesichert wurde. Wer die App öffnet, sieht es.
-STAND_DATEI="${STAND_DATEI:-./daten/sicherung-stand.json}"
+# Der Stand muss dorthin, wo die ANWENDUNG liest — und die läuft im
+# Container mit DATA_PATH=/data, also im Volume. Das Skript hier läuft auf
+# dem Host: Eine Datei in ./daten sähe sie nie.
+#
+# Beim ersten Betriebstest genau so passiert: Das Skript schrieb brav seinen
+# Stand, die App meldete weiter "noch nie gesichert". Kein Test hätte das
+# gefunden — die laufen alle mit lokalem DATA_PATH.
+STAND_DATEI="${STAND_DATEI:-}"
 
 schreibeStand() {
   local ausgang="$1" meldung="$2"
-  mkdir -p "$(dirname "$STAND_DATEI")" 2>/dev/null || return 0
-  cat > "$STAND_DATEI" <<ENDE || true
+  local inhalt
+  inhalt=$(cat <<ENDE
 {
   "ausgang": "$ausgang",
   "zeitpunkt": "$(date -Iseconds)",
@@ -36,6 +43,21 @@ schreibeStand() {
   "meldung": "$meldung"
 }
 ENDE
+)
+
+  # Ausdrücklich gesetzter Pfad (Tests, Betrieb ohne Container) gewinnt.
+  if [ -n "$STAND_DATEI" ]; then
+    mkdir -p "$(dirname "$STAND_DATEI")" 2>/dev/null || true
+    printf '%s\n' "$inhalt" > "$STAND_DATEI" 2>/dev/null || true
+    return 0
+  fi
+
+  # Normalfall: ins Volume der Anwendung. Läuft der Container nicht, bleibt
+  # der letzte Stand stehen und altert — die Übersicht wird dadurch von
+  # selbst rot, was hier genau richtig ist.
+  printf '%s\n' "$inhalt" \
+    | docker compose exec -T app sh -c 'cat > /data/sicherung-stand.json' 2>/dev/null \
+    || true
 }
 
 # Läuft bei jedem Abbruch — egal an welcher Zeile.
