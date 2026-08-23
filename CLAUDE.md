@@ -4,7 +4,7 @@ Web-Anwendung für Handy und iPad: Baumaschinen mit vorhandenen 1D-Strichcode-Et
 scannen, ausgeben, zurücknehmen — mit lückenloser Historie, wer ein Gerät wann auf
 welche Baustelle gebracht hat.
 
-**Stand: 2026-08-21 — AP1 bis AP12 fertig, als Docker-Paket lauffähig.** Anmelden, scannen, ausgeben,
+**Stand: 2026-08-23 — AP1 bis AP15 fertig, als Docker-Paket lauffähig.** Anmelden, scannen, ausgeben,
 zurücknehmen, umbuchen; Fotos und Dokumente; Prüfungen; Schäden; Zubehör;
 Geräte anlegen und bearbeiten, Import/Export als Tabelle, Etikettendruck;
 **Benutzerverwaltung in der Oberfläche mit frei zusammenstellbaren Rollen.**
@@ -26,7 +26,7 @@ wsl -d Ubuntu-24.04 -- docker start tracker-db   # Datenbank hoch
 npm run db:migrate                                # Schema aktuell halten
 npm run benutzer:anlegen -- --name <name> --rolle verwaltung
 npm run build && node dist/index.js               # läuft auf :3000
-npm test                                          # 338 Tests
+npm test                                          # 351 Tests
 node scripts/rauchtest.mjs <name> <passwort>      # Anmeldung, gegen die laufende App
 node scripts/durchlauf.mjs <name> <passwort>      # Büro-Weg: anlegen, etikettieren
 node scripts/durchlauf-buchen.mjs <name> <pw>     # Baustellen-Weg: scannen, buchen
@@ -546,6 +546,58 @@ wieder entfernt.
 
 Formatierungsregeln sind abgeschaltet (`eslint-config-prettier`): Zwei
 Werkzeuge, die sich über Zeilenumbrüche streiten, kosten nur Zeit.
+
+## AP15 — Fristen, Betrieb, Regal-Etiketten (2026-08-23)
+
+Vier Befunde aus einer Durchsicht des fertigen Pakets, alle im Code belegt.
+
+**1. Die App beantwortete ihre wichtigste wiederkehrende Frage nicht.**
+`GET /pruefungen/faellig` lieferte seit AP8 eine fertige Ampelliste —
+**keine einzige Ansicht rief sie ab.** Fällige Prüfungen sah man nur am
+einzelnen Gerät; bei 200 Maschinen ist das keine Antwort. Neu:
+`web/src/views/PruefungenView.vue` unter `/pruefungen`, nach Dringlichkeit
+gruppiert, dazu eine Kennzahl und die fünf dringendsten in der Übersicht.
+Restfristen stehen in Worten („seit 426 Tagen", „heute", „in 31 Tagen") —
+im Bauhof brauchbarer als ein Datum, das man gegen den Kalender halten muss.
+Serverseitig war **nichts** zu ändern.
+
+*Nebenbefund:* Der Frontend-Typ hieß `FaelligeePruefung` (doppeltes e) und
+wurde nirgends verwendet — der Tippfehler war nie aufgefallen, weil ihn nie
+jemand aufrief.
+
+**2. Der Health-Check log.** `app.get("/api/health", (c) => c.json({ok:true}))`
+fasste die Datenbank nicht an. In dieser Umgebung ist genau das passiert:
+Docker meldete `healthy`, während jede Anmeldung an einer weggebrochenen
+Verbindung scheiterte — auf dem Mini-PC hieße das: kein Neustart, keine
+Meldung. Jetzt `SELECT 1`, Erfolg → 200, Fehler → 503, **ohne** zu verraten
+warum (der Endpunkt ist anonym erreichbar; diese Zurückhaltung war und bleibt
+Absicht). Das Ergebnis wird ~5 s zwischengespeichert, sonst könnte eine
+Anfrageflut Datenbanklast erzeugen.
+
+**Im Betrieb gegengeprüft:** `docker compose stop postgres` → nach 80
+Sekunden steht der App-Container auf `unhealthy`, der Endpunkt antwortet
+`503 {"ok":false}`; nach dem Wiederanlauf wieder gesund.
+
+**3. Die Docker-Protokolle wuchsen unbegrenzt.** Jetzt 3 × 10 MB je Dienst.
+Der Ausfall, der sonst nach zwei Jahren kommt und den niemand kommen sieht.
+
+**4. Regal-Etiketten ließen sich nicht drucken.** Das System vergibt
+Lagerplatz-Kennungen (`P-0001`), erkennt sie beim Scannen und zeigt den
+Regalinhalt — der Druck kannte nur Geräte. Neu: `POST
+/etiketten/lagerplaetze` und eine zweite Auswahl in der Etiketten-Ansicht.
+**Bewusst getrennt** von der Geräte-Route: Die beiden Nummernkreise sind
+durchgängig auseinandergehalten, bis hinunter in zwei CHECK-Constraints —
+ein gemeinsamer Endpunkt wäre die erste Stelle, an der sie wieder
+zusammenliefen.
+
+**Beim Testen:** Der erste Test für die Regal-Etiketten prüfte auf `"P-"` im
+PDF-Text und wurde rot. PDFKit legt Schriftzeichen als Glyphen-Kennungen ab —
+dasselbe war bei den Geräte-Etiketten schon einmal aufgefallen. Der Test
+prüft jetzt das Belegbare (maßhaltiges PDF mit Inhalt) und zusätzlich, dass
+zwei Regale einen anderen Bogen ergeben als eines; die Lesbarkeit bleibt
+ausdrücklich der Handprüfung.
+
+**351 Tests** (vorher 338), Lint sauber, alle sechs Durchläufe grün.
 
 ## Nächster Schritt
 
