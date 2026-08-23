@@ -146,7 +146,7 @@ export interface Pruefung {
 
 export type Ampel = "ueberfaellig" | "faellig" | "bald" | "ok";
 
-export interface FaelligeePruefung {
+export interface FaelligePruefung {
   geraet_id: string;
   inventarnummer: string | null;
   bezeichnung: string;

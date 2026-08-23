@@ -54,6 +54,54 @@ const naechsteNummer = computed(() =>
 );
 
 const liste = computed(() => bestand.suche(suchtext.value));
+
+/**
+ * Regalplätze — der zweite Nummernkreis.
+ *
+ * Bewusst eine getrennte Auswahl und ein getrennter Knopf: Geräte-Etiketten
+ * (Ziffern) und Regal-Etiketten (P-…) sind in dieser Anwendung durchgängig
+ * getrennt, bis hinunter in zwei CHECK-Constraints der Datenbank. Ein
+ * gemeinsamer Bogen wäre die erste Stelle, an der sie wieder zusammenliefen.
+ */
+const plaetze = computed(() => bestand.lagerplaetze.filter((p) => p.aktiv && p.barcode));
+const gewaehlteePlaetze = ref<Set<string>>(new Set());
+const platzLaeuft = ref(false);
+
+const platzAnzahl = computed(() => gewaehlteePlaetze.value.size);
+
+function platzUmschalten(id: string): void {
+  const neu = new Set(gewaehlteePlaetze.value);
+  if (neu.has(id)) neu.delete(id);
+  else neu.add(id);
+  gewaehlteePlaetze.value = neu;
+}
+
+async function regaleDrucken(): Promise<void> {
+  if (!platzAnzahl.value || platzLaeuft.value) return;
+  platzLaeuft.value = true;
+  fehler.value = null;
+  try {
+    const antwort = await fetch("/api/etiketten/lagerplaetze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({
+        lagerplaetze: [...gewaehlteePlaetze.value],
+        format: format.value,
+        startPosition: startPosition.value,
+      }),
+    });
+    if (!antwort.ok) {
+      const daten = await antwort.json().catch(() => ({}));
+      throw new Error(daten.error ?? "Die Etiketten konnten nicht erzeugt werden");
+    }
+    window.open(URL.createObjectURL(await antwort.blob()), "_blank");
+  } catch (f) {
+    fehler.value = f instanceof Error ? f.message : "Die Etiketten konnten nicht erzeugt werden";
+  } finally {
+    platzLaeuft.value = false;
+  }
+}
 const anzahl = computed(() => gewaehlt.value.size);
 const proBogen = computed(
   () => formate.value.find((f) => f.schluessel === format.value)?.proBogen ?? 24,
@@ -334,6 +382,47 @@ async function drucken(): Promise<void> {
         </ul>
       </section>
 
+      <section v-if="plaetze.length">
+        <h2 class="pt-mikro abschnitt">Regalplätze auswählen</h2>
+        <p class="pt-gedaempft hinweis regalhinweis">
+          Eigener Bogen, eigener Knopf: Regal-Kennungen beginnen mit
+          <span class="pt-mono">P-</span> und dürfen nie zwischen die
+          Gerätenummern geraten.
+        </p>
+
+        <ul class="pt-karte pt-liste auswahl">
+          <li v-for="pl in plaetze" :key="pl.id">
+            <button class="pt-zeile" @click="platzUmschalten(pl.id)">
+              <span
+                class="haken"
+                :class="{ 'haken--an': gewaehlteePlaetze.has(pl.id) }"
+                aria-hidden="true"
+              >
+                <Symbol v-if="gewaehlteePlaetze.has(pl.id)" name="haken" :groesse="16" />
+              </span>
+              <div class="pt-zeile__haupt">
+                <div class="pt-zeile__titel">{{ pl.bezeichnung }}</div>
+                <div class="pt-zeile__unter pt-mono">{{ pl.barcode ?? "ohne Kennung" }}</div>
+              </div>
+            </button>
+          </li>
+        </ul>
+
+        <div class="regalknopf">
+          <button
+            class="pt-btn pt-btn--breit"
+            :disabled="!platzAnzahl || platzLaeuft"
+            @click="regaleDrucken"
+          >
+            {{
+              platzLaeuft
+                ? "Wird erzeugt …"
+                : `${platzAnzahl} Regal-Etikett${platzAnzahl === 1 ? "" : "en"} öffnen`
+            }}
+          </button>
+        </div>
+      </section>
+
       <p v-if="fehler" class="pt-meldung pt-meldung--fehler">{{ fehler }}</p>
     </div>
 
@@ -352,6 +441,13 @@ async function drucken(): Promise<void> {
 </template>
 
 <style scoped>
+.regalhinweis {
+  padding: 0 var(--space-4) var(--space-2);
+}
+.regalknopf {
+  padding: var(--space-3) var(--space-4) 0;
+}
+
 .stand {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);

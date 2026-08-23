@@ -12,6 +12,7 @@ import { z } from "zod";
 import { darf, type AppEnv } from "../auth.js";
 import { EingabeFehler } from "../fehler.js";
 import { db } from "../../db/client.js";
+import { listeLagerplaetze } from "../../data/stammdaten.js";
 import { FIRMENNAME, ETIKETT_FORMAT } from "../../config.js";
 import { baueBogen, baueTestbogen, FORMATE } from "../../etiketten/bogen.js";
 import {
@@ -135,6 +136,55 @@ etikettenRouten.get("/etiketten/testbogen", darf("etiketten.drucken"), async (c)
   c.header("Content-Disposition", 'inline; filename="testbogen.pdf"');
   c.header("Cache-Control", "no-store");
   // Hono erwartet Standard-Bytes, keinen Node-eigenen Puffer.
+  return c.body(new Uint8Array(pdf));
+});
+
+/**
+ * Etiketten für Regalplätze.
+ *
+ * Das System vergibt Lagerplatz-Kennungen (`P-0001`), erkennt sie beim
+ * Scannen und zeigt, was im Regal liegt — drucken ließen sie sich bis
+ * hierher aber nicht. Der getrennte Nummernkreis war damit nur zur Hälfte
+ * nutzbar: Geräte bekamen Aufkleber, Regale mussten von Hand beschriftet
+ * werden.
+ *
+ * Bewusst eine eigene Route statt eines Schalters an der Geräte-Route: Die
+ * beiden Nummernkreise sind in dieser Anwendung durchgängig getrennt (zwei
+ * CHECK-Constraints setzen das in der Datenbank durch), und ein gemeinsamer
+ * Endpunkt wäre die erste Stelle, an der sie wieder zusammenliefen.
+ */
+etikettenRouten.post("/etiketten/lagerplaetze", darf("etiketten.drucken"), async (c) => {
+  const roh = await c.req.json().catch(() => null);
+  const gelesen = z
+    .object({
+      lagerplaetze: z.array(z.string().uuid()).min(1).max(500),
+      format: z.string().max(20).optional(),
+      startPosition: z.number().int().min(0).max(100).optional(),
+    })
+    .safeParse(roh);
+  if (!gelesen.success) {
+    throw new EingabeFehler("Es wurde keine gültige Liste von Regalplätzen gesendet.");
+  }
+  const { lagerplaetze: ids, format, startPosition } = gelesen.data;
+
+  const alle = await listeLagerplaetze();
+  const gewaehlt = alle.filter((p) => ids.includes(p.id) && p.barcode);
+  if (!gewaehlt.length) {
+    throw new EingabeFehler("Keiner der gewählten Regalplätze hat eine Kennung.");
+  }
+
+  const pdf = await baueBogen(
+    gewaehlt.map((p) => ({ code: p.barcode! })),
+    {
+      format: (format ?? ETIKETT_FORMAT) as keyof typeof FORMATE,
+      firmenname: FIRMENNAME,
+      ...(startPosition !== undefined ? { startPosition } : {}),
+    },
+  );
+
+  c.header("Content-Type", "application/pdf");
+  c.header("Content-Disposition", 'inline; filename="etiketten-regale.pdf"');
+  c.header("Cache-Control", "no-store");
   return c.body(new Uint8Array(pdf));
 });
 

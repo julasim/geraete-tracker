@@ -5,7 +5,7 @@ import { RouterLink, useRouter } from "vue-router";
 import { api } from "@/api";
 import { useAnmeldung } from "@/stores/anmeldung";
 import { useBestand } from "@/stores/bestand";
-import type { OffeneAusgabe } from "@/typen";
+import type { FaelligePruefung, OffeneAusgabe } from "@/typen";
 import Kopf from "@/components/Kopf.vue";
 
 const anmeldung = useAnmeldung();
@@ -13,9 +13,13 @@ const bestand = useBestand();
 const router = useRouter();
 
 const offene = ref<OffeneAusgabe[]>([]);
+const pruefungen = ref<FaelligePruefung[]>([]);
 const dunkel = ref(document.documentElement.classList.contains("dunkel"));
 
 const ueberfaellig = computed(() => offene.value.filter((o) => o.ueberfaellig));
+const pruefungUeberfaellig = computed(
+  () => pruefungen.value.filter((p) => p.ampel === "ueberfaellig").length,
+);
 
 onMounted(async () => {
   await bestand.laden();
@@ -23,6 +27,11 @@ onMounted(async () => {
     offene.value = await api.get<OffeneAusgabe[]>("/buchungen/offen");
   } catch {
     // Die Übersicht ist Beiwerk — sie darf die Seite nicht kaputt machen.
+  }
+  try {
+    pruefungen.value = await api.get<FaelligePruefung[]>("/pruefungen/faellig");
+  } catch {
+    // Ebenso.
   }
 });
 
@@ -62,7 +71,47 @@ async function abmelden(): Promise<void> {
           <span class="zahl__wert">{{ ueberfaellig.length }}</span>
           <span class="zahl__text">überfällig</span>
         </div>
+        <div class="zahl" :class="{ 'zahl--warnung': pruefungUeberfaellig > 0 }">
+          <span class="zahl__wert">{{ pruefungen.length }}</span>
+          <span class="zahl__text">Prüfungen</span>
+        </div>
       </div>
+
+      <!-- Prüffristen zuerst: Ein überfälliges Gerät darf nicht eingesetzt
+           werden, ein lange ausgeliehenes schon. -->
+      <section v-if="pruefungen.length">
+        <h2 class="pt-mikro abschnitt">Prüfungen stehen an</h2>
+        <div class="pt-karte">
+          <ul class="pt-liste">
+            <li v-for="p in pruefungen.slice(0, 5)" :key="`${p.geraet_id}-${p.pruefart}`">
+              <RouterLink :to="`/geraete/${p.geraet_id}`" class="pt-zeile">
+                <div class="pt-zeile__haupt">
+                  <div class="pt-zeile__titel">{{ p.bezeichnung }}</div>
+                  <div class="pt-zeile__unter">{{ p.pruefart }}</div>
+                </div>
+                <span
+                  class="pt-chip"
+                  :class="p.ampel === 'ueberfaellig' ? 'pt-chip--defekt' : 'pt-chip--warnung'"
+                >
+                  {{ p.tage_bis_faellig < 0 ? "überfällig" : `${p.tage_bis_faellig} T` }}
+                </span>
+              </RouterLink>
+            </li>
+            <li>
+              <button class="pt-zeile" @click="router.push('/pruefungen')">
+                <div class="pt-zeile__haupt">
+                  <div class="pt-zeile__titel">Alle Fristen ansehen</div>
+                  <div class="pt-zeile__unter">
+                    {{ pruefungen.length }} anstehend<template v-if="pruefungUeberfaellig">
+                      · {{ pruefungUeberfaellig }} überfällig</template
+                    >
+                  </div>
+                </div>
+              </button>
+            </li>
+          </ul>
+        </div>
+      </section>
 
       <section v-if="offene.length">
         <h2 class="pt-mikro abschnitt">Derzeit draußen</h2>

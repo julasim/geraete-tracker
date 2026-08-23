@@ -16,6 +16,8 @@ import { secureHeaders } from "hono/secure-headers";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { ZodError } from "zod";
 import { PRODUKTION } from "../config.js";
+import type postgres from "postgres";
+import { db } from "../db/client.js";
 import { logError } from "../logger.js";
 import { anmeldungPruefen, type AppEnv } from "./auth.js";
 import {
@@ -176,7 +178,55 @@ app.use(
 //
 // Bewusst ohne Angaben zu Version, Datenbank oder Laufzeit: Der Endpunkt ist
 // anonym erreichbar, je weniger er über das Innenleben verrät, desto besser.
-app.get("/api/health", (c) => c.json({ ok: true }));
+// Er sagt nur, OB die Anwendung arbeiten kann — nicht warum nicht.
+//
+// Dass er dafür die Datenbank anfassen muss, hat dieser Betrieb gelehrt:
+// Vorher antwortete er immer `{ok:true}`, und Docker meldete `healthy`,
+// während jede Anmeldung an einer weggebrochenen Datenbankverbindung
+// scheiterte. Ein Gesundheitsbericht, der nur die eigene Existenz bestätigt,
+// ist keiner.
+
+/**
+ * Zwischenspeicher für den Zustand.
+ *
+ * Der Endpunkt ist anonym erreichbar — ohne ihn könnte eine Anfrageflut
+ * Datenbanklast erzeugen. Der Docker-Healthcheck fragt alle 30 Sekunden;
+ * fünf Sekunden Gedächtnis merkt er nicht, ein Angreifer schon.
+ */
+const HEALTH_GEDAECHTNIS_MS = 5_000;
+let healthStand: { zeit: number; gesund: boolean } | null = null;
+
+/**
+ * Antwortet die Datenbank?
+ *
+ * `sql` ist nur für die Prüfung da: Wer einen Client ausdrücklich übergibt,
+ * bekommt das Ergebnis für GENAU diesen — ohne Gedächtnis. Sonst könnte ein
+ * Test mit einem absichtlich toten Client den Zustand des laufenden Betriebs
+ * überschreiben, und der Container ginge fälschlich auf `unhealthy`.
+ */
+export async function datenbankErreichbar(sql?: postgres.Sql): Promise<boolean> {
+  const eigener = sql !== undefined;
+  const jetzt = Date.now();
+
+  if (!eigener && healthStand && jetzt - healthStand.zeit < HEALTH_GEDAECHTNIS_MS) {
+    return healthStand.gesund;
+  }
+
+  let gesund = true;
+  try {
+    await (sql ?? db())`SELECT 1`;
+  } catch {
+    gesund = false;
+  }
+
+  if (!eigener) healthStand = { zeit: jetzt, gesund };
+  return gesund;
+}
+
+app.get("/api/health", async (c) => {
+  const gesund = await datenbankErreichbar();
+  return c.json({ ok: gesund }, gesund ? 200 : 503);
+});
 
 // ── Standard: gesperrt ──────────────────────────────────────────────────────
 // Läuft vor allen Routen. Alles unter /api ist geschützt, außer es steht in

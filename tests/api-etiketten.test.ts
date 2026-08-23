@@ -55,6 +55,7 @@ function entpackterText(pdf: Buffer): string {
 let admin: Sitzung;
 let mitarbeiter: Sitzung;
 const geraetIds: string[] = [];
+const platzIds: string[] = [];
 
 beforeAll(async () => {
   await raeumeTestdatenAuf();
@@ -69,6 +70,24 @@ beforeAll(async () => {
     });
     const daten = (await antwort.json()) as { id: string };
     geraetIds.push(daten.id);
+  }
+
+  // Zwei Regalplätze — ihre Kennungen (P-0001 …) vergibt der Server selbst.
+  const ort = await mitCookie("/api/standorte", admin.cookie, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "TEST-Etikett Halle", typ: "lager" }),
+  });
+  const ortId = ((await ort.json()) as { id: string }).id;
+
+  for (const bez of ["TEST-Etikett Regal 1", "TEST-Etikett Regal 2"]) {
+    const antwort = await mitCookie("/api/lagerplaetze", admin.cookie, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ standort_id: ortId, bezeichnung: bez }),
+    });
+    const daten = (await antwort.json()) as { id: string };
+    platzIds.push(daten.id);
   }
 });
 
@@ -205,6 +224,81 @@ describe("Über die API", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ geraete: geraetIds }),
+    });
+    expect(antwort.status).toBe(403);
+  });
+});
+
+describe("Regal-Etiketten", () => {
+  it("druckt Etiketten für ausgewählte Regalplätze", async () => {
+    const antwort = await mitCookie("/api/etiketten/lagerplaetze", admin.cookie, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lagerplaetze: platzIds }),
+    });
+    expect(antwort.status).toBe(200);
+    expect(antwort.headers.get("content-type")).toContain("application/pdf");
+
+    // Wie beim Geräte-Bogen lässt sich der Klartext nicht prüfen — PDFKit
+    // legt Schriftzeichen als Glyphen-Kennungen ab. Belegbar ist, dass ein
+    // maßhaltiges PDF mit Inhalt entsteht; ob die Kennung lesbar klebt,
+    // entscheidet sich am Drucker (docs/scanner-abnahme.md).
+    const pdf = Buffer.from(await antwort.arrayBuffer());
+    expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
+    expect(entpackterText(pdf).length).toBeGreaterThan(1000);
+  });
+
+  it("druckt für zwei Regale einen anderen Bogen als für eines", async () => {
+    // Die Gegenprobe dazu: Käme immer derselbe Bogen heraus, wäre die
+    // Auswahl wirkungslos und niemandem fiele es auf.
+    const beide = await mitCookie("/api/etiketten/lagerplaetze", admin.cookie, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lagerplaetze: platzIds }),
+    });
+    const eines = await mitCookie("/api/etiketten/lagerplaetze", admin.cookie, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lagerplaetze: [platzIds[0]] }),
+    });
+    const a = Buffer.from(await beide.arrayBuffer());
+    const b = Buffer.from(await eines.arrayBuffer());
+    expect(a.equals(b)).toBe(false);
+    expect(a.length).toBeGreaterThan(b.length);
+  });
+
+  it("nimmt eine Startposition für angebrochene Bögen", async () => {
+    const antwort = await mitCookie("/api/etiketten/lagerplaetze", admin.cookie, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lagerplaetze: platzIds, startPosition: 3 }),
+    });
+    expect(antwort.status).toBe(200);
+  });
+
+  it("weist eine leere Auswahl ab", async () => {
+    const antwort = await mitCookie("/api/etiketten/lagerplaetze", admin.cookie, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lagerplaetze: [] }),
+    });
+    expect(antwort.status).toBe(400);
+  });
+
+  it("meldet, wenn keiner der gewählten Plätze existiert", async () => {
+    const antwort = await mitCookie("/api/etiketten/lagerplaetze", admin.cookie, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lagerplaetze: ["00000000-0000-4000-8000-000000000000"] }),
+    });
+    expect(antwort.status).toBe(400);
+  });
+
+  it("lässt Mitarbeiter auch hier nicht drucken", async () => {
+    const antwort = await mitCookie("/api/etiketten/lagerplaetze", mitarbeiter.cookie, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lagerplaetze: platzIds }),
     });
     expect(antwort.status).toBe(403);
   });

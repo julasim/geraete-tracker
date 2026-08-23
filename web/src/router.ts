@@ -42,6 +42,13 @@ export const router = createRouter({
       component: () => import("@/views/BuchenView.vue"),
     },
     { path: "/orte", name: "orte", component: () => import("@/views/OrteView.vue") },
+    // Ohne meta.recht: Lesen ist in dieser Anwendung kein Recht — wer
+    // angemeldet ist, darf sehen, was ansteht.
+    {
+      path: "/pruefungen",
+      name: "pruefungen",
+      component: () => import("@/views/PruefungenView.vue"),
+    },
     { path: "/mehr", name: "mehr", component: () => import("@/views/MehrView.vue") },
     {
       path: "/etiketten",

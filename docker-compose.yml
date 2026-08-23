@@ -20,6 +20,15 @@ services:
     image: geraete-tracker:neueste
     container_name: tracker-app
     restart: unless-stopped
+    # Protokolle begrenzen: 3 Dateien à 10 MB, dann wird die älteste
+    # überschrieben. Ohne diese Angabe wachsen sie unbegrenzt — auf einem
+    # Mini-PC, der jahrelang durchläuft, ist das der Ausfall, der nach zwei
+    # Jahren kommt und den niemand kommen sieht.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       NODE_ENV: production
       API_PORT: 3000
@@ -56,6 +65,15 @@ services:
     image: postgres:16
     container_name: tracker-postgres
     restart: unless-stopped
+    # Protokolle begrenzen: 3 Dateien à 10 MB, dann wird die älteste
+    # überschrieben. Ohne diese Angabe wachsen sie unbegrenzt — auf einem
+    # Mini-PC, der jahrelang durchläuft, ist das der Ausfall, der nach zwei
+    # Jahren kommt und den niemand kommen sieht.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-tracker}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?In der .env fehlt POSTGRES_PASSWORD}
@@ -81,6 +99,15 @@ services:
     image: caddy:2-alpine
     container_name: tracker-caddy
     restart: unless-stopped
+    # Protokolle begrenzen: 3 Dateien à 10 MB, dann wird die älteste
+    # überschrieben. Ohne diese Angabe wachsen sie unbegrenzt — auf einem
+    # Mini-PC, der jahrelang durchläuft, ist das der Ausfall, der nach zwei
+    # Jahren kommt und den niemand kommen sieht.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       DOMAIN: ${DOMAIN:?In der .env fehlt DOMAIN (z. B. geraete.meinefirma.at oder tracker.local)}
       # Ergibt "email julius@..." wenn ACME_EMAIL gesetzt ist, sonst nichts.

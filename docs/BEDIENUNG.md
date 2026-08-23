@@ -1,6 +1,33 @@
 # Bedienung
 
-Etiketten drucken, Benutzer anlegen, Rollen vergeben.
+Prüffristen im Blick behalten, Etiketten drucken, Benutzer anlegen,
+Rollen vergeben.
+
+---
+
+# Was ist fällig?
+
+**Mehr → Prüfungen stehen an → Alle Fristen ansehen** (oder direkt
+`/pruefungen`).
+
+Die Liste zeigt in drei Stufen, was ansteht:
+
+| | |
+|---|---|
+| **Überfällig** | Die Frist ist verstrichen. Das Gerät darf so nicht mehr eingesetzt werden. |
+| **Fällig** | Innerhalb der nächsten zwei Wochen. |
+| **Bald** | In den nächsten zwei Monaten — Zeit, einen Termin zu machen. |
+
+Ein Tipp auf die Zeile führt zum Gerät; dort wird die Prüfung nach der
+Durchführung eingetragen. Die neue Frist rechnet die Anwendung selbst aus dem
+Intervall der Prüfart.
+
+Auf der Übersicht steht die Zahl der anstehenden Prüfungen als Kennzahl,
+zusammen mit den fünf dringendsten.
+
+> **Was hier nicht auftaucht:** Geräte ohne hinterlegte Prüfart. Geprüft wird
+> gegen das, was am Gerät steht — steht dort nichts, weiß die Anwendung von
+> keiner Frist. Beim Erfassen also gleich die Prüfart mitgeben.
 
 ---
 
@@ -12,6 +39,12 @@ Etiketten drucken, Benutzer anlegen, Rollen vergeben.
 wird die Nummer, die das Gerät bereits trägt — für ein Ersatzetikett, wenn der
 alte Aufkleber abgerissen ist. Das alte bleibt gültig; ein Gerät darf mehrere
 Etiketten tragen.
+
+## Für Regalplätze
+
+**Mehr → Etiketten drucken → Regalplätze auswählen.** Eigene Liste, eigener
+Knopf: Regal-Kennungen beginnen mit `P-` und dürfen nie zwischen die
+Gerätenummern geraten — die Datenbank lässt das auch gar nicht zu.
 
 ## Auf Vorrat, für Geräte ohne Aufkleber
 
