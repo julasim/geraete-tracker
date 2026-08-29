@@ -96,11 +96,22 @@ afterAll(async () => {
   await schliesseDb();
 });
 
-/** Die Nummer, die die Anwendung als nächste vergeben würde. */
+/**
+ * Die Nummer, die die Anwendung als nächste vergeben würde.
+ *
+ * `hoechste: null` heißt: Das Register ist leer — eine frische Anlage. Die
+ * Vergabe beginnt dann bei 10000 (`naechsteFreie` in `src/data/nummern.ts`),
+ * die erste Nummer ist also 10001, nicht 00001.
+ *
+ * Diese Zeile fehlte zuerst, und der Test war trotzdem grün: Die
+ * Entwicklungsdatenbank ist längst gewachsen, dort tritt der Fall nie auf.
+ * Aufgefallen ist es erst in der Werkbank, die jedes Mal bei Null anfängt.
+ */
 async function naechste(): Promise<string> {
   const { daten } = await sende("/api/etiketten/nummern", "GET");
   const hoechste = (daten as { hoechste: string | null }).hoechste;
-  return String(Number(hoechste) + 1).padStart(5, "0");
+  const stand = hoechste === null ? 10_000 : Number(hoechste);
+  return String(stand + 1).padStart(5, "0");
 }
 
 describe("Vorratsdruck", () => {

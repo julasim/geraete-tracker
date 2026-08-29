@@ -67,8 +67,18 @@ await sql`DELETE FROM rollen WHERE id = 'pruef-rolle'`;
 // ── Ist die Datenbank jungfräulich? ────────────────────────────────────────
 // MUSS vor der Vorbereitung stehen: Die legt selbst ein Gerät an, und die
 // Zählung hielte danach jede frische Datenbank für benutzt.
+//
+// Konten zählen mit: Der dokumentierte Installationsweg legt ERST das
+// Verwaltungskonto an und ruft DANN diese Prüfung (docs/BETRIEB.md). Ohne
+// die Konten in der Zählung galt die Datenbank dabei noch als frisch, und
+// die Prüfung "der Seed legt kein Konto an" fand das eben angelegte Konto
+// und meldete einen Mangel. Jede Erstinstallation sah so eine rote Zeile.
+// Ob der Seed ein Konto anlegt, lässt sich ohnehin nur an einer wirklich
+// unbenutzten Datenbank beantworten.
 const [benutzt] = await sql<{ n: number }[]>`
-  SELECT ((SELECT count(*) FROM geraete) + (SELECT count(*) FROM buchungen))::int AS n`;
+  SELECT ((SELECT count(*) FROM geraete)
+        + (SELECT count(*) FROM buchungen)
+        + (SELECT count(*) FROM benutzer WHERE benutzername <> 'pruef-konto'))::int AS n`;
 const frischeDb = (benutzt?.n ?? 0) === 0;
 
 // ── Vorbereitung ───────────────────────────────────────────────────────────
@@ -246,9 +256,14 @@ await pruefe("Auch jedes Etikett steht im Register", async () => {
   if ((fehlt?.n ?? 0) > 0) throw new Error(`${fehlt!.n} Etikett(en) fehlen im Register`);
 });
 
+// Die Prüfung bringt ihre eigene Zeile mit, statt eine vorhandene zu
+// verdoppeln. Vorher stand hier `INSERT ... SELECT ... LIMIT 1`: Auf einer
+// frischen Anlage ist das Register leer, der SELECT traf null Zeilen, der
+// INSERT lief ohne Fehler durch — und die Prüfung meldete "wurde NICHT
+// abgelehnt", obwohl sie in Wahrheit gar nichts geprüft hatte.
+await sql`INSERT INTO etikettennummern (nummer, zustand) VALUES ('PRUEF-88888', 'gesehen')`;
 await mussScheitern("Dieselbe Nummer lässt sich nicht zweimal eintragen", () =>
-  sql`INSERT INTO etikettennummern (nummer, zustand)
-      SELECT nummer, 'gesehen' FROM etikettennummern LIMIT 1`);
+  sql`INSERT INTO etikettennummern (nummer, zustand) VALUES ('PRUEF-88888', 'gesehen')`);
 
 await mussScheitern("Ein erfundener Zustand wird abgelehnt", () =>
   sql`INSERT INTO etikettennummern (nummer, zustand) VALUES ('PRUEF-99999', 'irgendwas')`);
