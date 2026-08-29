@@ -242,7 +242,14 @@ a {
   background: var(--info-bg);
   border-color: var(--info-fg);
 }
-.pt-chip--wartung {
+/*
+ * --wartung ist ein Geraetestatus, --warnung ein allgemeiner Hinweis
+ * (etwa "Passwort wechseln noetig" in der Benutzerverwaltung). Zwei
+ * Bedeutungen, dieselbe Farbe. Die zweite Klasse fehlte und wurde trotzdem
+ * benutzt: Der Chip erschien dort ohne Warnfarbe.
+ */
+.pt-chip--wartung,
+.pt-chip--warnung {
   color: var(--warning-fg);
   background: var(--warning-bg);
   border-color: var(--warning-fg);

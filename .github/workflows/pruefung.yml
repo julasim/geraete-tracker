@@ -72,6 +72,13 @@ jobs:
       - name: Typen (Oberfläche)
         run: npm --prefix web run pruefe
 
+      # Findet zwei Fehlerarten, die weder TypeScript noch ESLint sehen
+      # können: eine Route ohne Bedienung (Baustellen ließen sich lange nicht
+      # anlegen, obwohl es die Route gab) und eine CSS-Klasse, die es nicht
+      # gibt (die Ansicht wird dann stumm ungestaltet ausgeliefert).
+      - name: Oberfläche vollständig verdrahtet
+        run: npm run pruefe:oberflaeche
+
       - name: Tests
         run: npm test
 

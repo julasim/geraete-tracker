@@ -22,7 +22,8 @@
     "dev:web": "npm --prefix web run dev",
     "postinstall": "npm --prefix web install",
     "lint": "eslint src/ tests/ scripts/ web/src/",
-    "lint:fix": "eslint src/ tests/ scripts/ web/src/ --fix"
+    "lint:fix": "eslint src/ tests/ scripts/ web/src/ --fix",
+    "pruefe:oberflaeche": "node scripts/pruefe-oberflaeche.mjs"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.9",

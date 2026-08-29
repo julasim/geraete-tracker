@@ -308,7 +308,7 @@ onMounted(laden);
 .passwort__titel {
   font-size: var(--fs-13);
   font-weight: var(--fw-semibold);
-  letter-spacing: var(--tracking-wide);
+  letter-spacing: var(--tracking-label);
   text-transform: uppercase;
   color: var(--fg-muted);
   margin-bottom: var(--space-3);

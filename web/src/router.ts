@@ -57,6 +57,15 @@ export const router = createRouter({
       meta: { recht: "etiketten.drucken" },
     },
     {
+      // Ohne meta.recht: Die Ansicht zeigt Schlagworte und Prüfarten, und
+      // Lesen ist in dieser Anwendung kein Recht. Die Knöpfe zum Ändern
+      // erscheinen nur mit stammdaten.pflegen bzw. pruefungen.eintragen —
+      // der Server weist es ohnehin ab.
+      path: "/stammdaten",
+      name: "stammdaten",
+      component: () => import("@/views/StammdatenView.vue"),
+    },
+    {
       path: "/austausch",
       name: "austausch",
       component: () => import("@/views/AustauschView.vue"),

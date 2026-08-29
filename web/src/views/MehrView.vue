@@ -182,6 +182,14 @@ async function abmelden(): Promise<void> {
                 </div>
               </button>
             </li>
+            <li>
+              <button class="pt-zeile" @click="router.push('/stammdaten')">
+                <div class="pt-zeile__haupt">
+                  <div class="pt-zeile__titel">Schlagworte und Prüfarten</div>
+                  <div class="pt-zeile__unter">Einteilung des Bestands und wiederkehrende Fristen</div>
+                </div>
+              </button>
+            </li>
             <li v-if="anmeldung.darf('etiketten.drucken')">
               <button class="pt-zeile" @click="router.push('/etiketten')">
                 <div class="pt-zeile__haupt">

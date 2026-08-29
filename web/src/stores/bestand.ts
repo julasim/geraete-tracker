@@ -67,6 +67,31 @@ export const useBestand = defineStore("bestand", () => {
     else standorte.value.push(standort);
   }
 
+  /** Wie ergaenzeStandort, für Lagerplätze. */
+  function ergaenzeLagerplatz(platz: Lagerplatz): void {
+    const i = lagerplaetze.value.findIndex((p) => p.id === platz.id);
+    if (i >= 0) lagerplaetze.value[i] = platz;
+    else lagerplaetze.value.push(platz);
+  }
+
+  /** Wie ergaenzeStandort, für Schlagworte. */
+  function ergaenzeSchlagwort(wort: Schlagwort): void {
+    const i = schlagworte.value.findIndex((w) => w.id === wort.id);
+    if (i >= 0) schlagworte.value[i] = wort;
+    else schlagworte.value.push(wort);
+  }
+
+  /** Ein gelöschtes Schlagwort aus der Liste nehmen. */
+  function entferneSchlagwort(id: string): void {
+    const i = schlagworte.value.findIndex((w) => w.id === id);
+    if (i >= 0) schlagworte.value.splice(i, 1);
+    // Auch an den Geräten: Sonst zeigt die Liste ein Schlagwort, das es
+    // nicht mehr gibt, bis jemand die Seite neu lädt.
+    for (const g of geraete.value) {
+      if (g.schlagworte?.length) g.schlagworte = g.schlagworte.filter((w) => w.id !== id);
+    }
+  }
+
   /** Ein einzelnes Gerät nach einer Buchung auffrischen. */
   function ersetze(geraet: Geraet): void {
     const i = geraete.value.findIndex((g) => g.id === geraet.id);
@@ -126,6 +151,9 @@ export const useBestand = defineStore("bestand", () => {
     laden,
     ersetze,
     ergaenzeStandort,
+    ergaenzeLagerplatz,
+    ergaenzeSchlagwort,
+    entferneSchlagwort,
     nachId,
     plaetzeAmStandort,
     suche,

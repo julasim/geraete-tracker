@@ -242,6 +242,31 @@ stehen und sich der Bestand auf drei Orte verteilt, die dasselbe meinen.
 jeder Buchung, die dorthin ging, und die Historie muss stimmen. Stillgelegte
 Orte verschwinden aus den Auswahlfeldern.
 
-*Lagerplätze, Schlagworte und Prüfarten lassen sich derzeit noch nicht in der
-Oberfläche anlegen — dafür braucht es die Schnittstelle. Siehe
-[`BETRIEB.md`](BETRIEB.md).*
+## Einen Ort ändern oder aus dem Verkehr ziehen
+
+Tippen Sie unter **Orte** auf den Ort, dann auf **Ort bearbeiten**. Dort lassen
+sich Name und Adresse ändern — oder der Ort **stilllegen**, wenn die Baustelle
+abgeschlossen ist. Stehen dort noch Geräte, sagt die Rückfrage, wie viele: Sie
+bleiben eingetragen, der Ort ist nur nicht mehr auswählbar.
+
+## Regalplätze
+
+Im aufgeklappten Ort auf **Regalplatz**, dann die Bezeichnung eintragen
+(„Regal C3"). **Die Kennung vergibt das System** (`P-0001`, `P-0002`, …) — sie
+wird als Etikett aufs Regal geklebt und ist beim Scannen die Antwort auf „was
+steht in diesem Regal?". Umbenennen geht jederzeit; die Kennung bleibt dabei
+unangetastet, weil das Etikett ja klebt.
+
+## Schlagworte und Prüfarten
+
+Unter **Mehr → Schlagworte und Prüfarten**.
+
+**Schlagworte** sind die einzige Einteilung des Bestands — es gibt bewusst
+keine festen Kategorien. Ein Gerät kann beliebig viele tragen. Vor dem Löschen
+steht, an wie vielen Geräten eines hängt; verschwindet es, verschwindet es auch
+dort.
+
+**Prüfarten** sind wiederkehrende Prüfungen und ihr Abstand (jährlich,
+halbjährlich …). Aus ihnen entsteht die Fristenliste unter *Was ist fällig?*;
+das Fälligkeitsdatum rechnet der Server aus der zuletzt eingetragenen Prüfung.
+Sie richten sie einmal beim Aufsetzen ein.

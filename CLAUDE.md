@@ -4,7 +4,7 @@ Web-Anwendung für Handy und iPad: Baumaschinen mit vorhandenen 1D-Strichcode-Et
 scannen, ausgeben, zurücknehmen — mit lückenloser Historie, wer ein Gerät wann auf
 welche Baustelle gebracht hat.
 
-**Stand: 2026-08-29 — AP1 bis AP18 fertig, als Docker-Paket abgenommen.** Anmelden, scannen, ausgeben,
+**Stand: 2026-08-29 — AP1 bis AP19 fertig, als Docker-Paket abgenommen.** Anmelden, scannen, ausgeben,
 zurücknehmen, umbuchen; Fotos und Dokumente; Prüfungen; Schäden; Zubehör;
 Geräte anlegen und bearbeiten, Import/Export als Tabelle, Etikettendruck;
 **Benutzerverwaltung in der Oberfläche mit frei zusammenstellbaren Rollen.**
@@ -800,6 +800,75 @@ Orte stillgelegt.
 **Noch offen:** Lagerplätze, Schlagworte und Prüfarten lassen sich weiterhin
 nur über die API pflegen. Prüfarten braucht man einmal beim Einrichten,
 Schlagworte gelegentlich — Baustellen waren der dringende Fall.
+
+## AP19 — Alle Stammdaten bedienbar, und eine Prüfung, die das sicherstellt (2026-08-29)
+
+Julius: „bitte einbauen. Das Programm muss wasserdicht sein." Zwei Teile also:
+die restlichen Lücken schließen — und dafür sorgen, dass sie nicht unbemerkt
+wiederkommen.
+
+**Zuerst das Prüfwerkzeug**, weil erst dadurch die Bestandsaufnahme belastbar
+wurde: `scripts/pruefe-oberflaeche.mjs` (`npm run pruefe:oberflaeche`, dazu ein
+Schritt in der Werkbank). Es prüft zwei Fehlerarten, die in diesem Projekt
+beide vorgekommen sind und die **weder TypeScript noch ESLint sehen können**:
+
+1. *Eine schreibende Route ohne Bedienung.* So blieben Baustellen unanlegbar
+   (AP18) und die Fristenliste unerreichbar (AP15).
+2. *Eine CSS-Klasse oder Gestaltungsvariable, die es nicht gibt.* Für den
+   Übersetzer ist beides eine gültige Zeichenkette; die Ansicht wird stumm
+   ungestaltet ausgeliefert.
+
+**Der erste Lauf fand drei Fehler im Bestand**, die niemand kannte:
+`pt-chip--warnung` existierte nicht — in der Benutzerverwaltung erschien
+„Passwort wechseln nötig" **ohne Warnfarbe**, ein Verwalter sah es nicht auf
+einen Blick. Dazu `var(--tracking-wide)`, das es ebenfalls nicht gibt (richtig:
+`--tracking-label`). Der dritte war ein **Fehlalarm des Skripts**: `konflikt`
+ist ein BEM-Block zu `.konflikt__stand` und braucht keine eigene Regel — das
+Skript erkennt solche Blöcke jetzt. *Ein Prüfwerkzeug, dem man nicht glaubt,
+wird abgeschaltet; Fehlalarme sind deshalb kein Schönheitsfehler.*
+
+**Gebaut — die restlichen sieben Bedienungen:**
+- **Orte:** bearbeiten und stilllegen (nie löschen — der Name steht in jeder
+  Buchung, die dorthin ging), Regalplätze anlegen und umbenennen. Die Kennung
+  (`P-0001`) vergibt weiterhin der Server; sie klebt als Etikett am Regal.
+- **`StammdatenView` (neu, `/stammdaten`):** Schlagworte anlegen, umbenennen,
+  löschen — mit Angabe, an wie vielen Geräten eines hängt, bevor man es
+  entfernt; Prüfarten anlegen mit Abstand in Worten („jährlich" statt „alle 12
+  Monate"). Bewusst **eine** Ansicht für beides: zwei Menüpunkte für zwei kurze
+  Listen wären mehr Navigation als Inhalt.
+
+Zwei Ausnahmen stehen mit Begründung im Skript statt als Ansicht:
+`POST /buchungen/korrektur` (eine Gegenbuchung soll niemand im Vorbeigehen
+auslösen) und `POST /etiketten/altbestand` (einmalig beim Einrichten).
+
+**Gestalterisch korrigiert:** Der erste Entwurf gab jedem Schlagwort einen
+roten „Löschen"-Knopf. Bei zwanzig Zeilen sind das zwanzig rote Flächen
+untereinander — lauter als alles andere auf der Seite, und das Auge gewöhnt
+sich daran. `pt-btn--gefahr` wird im ganzen Projekt **nirgends** verwendet;
+destruktive Aktionen sind stille Knöpfe, der Schutz ist die Rückfrage. Jetzt
+auch hier.
+
+**Gegenprobe des Werkzeugs:** Eine erfundene Klasse und eine entfernte
+Bedienung eingeschmuggelt — beide gemeldet, Rückgabewert 1, die Werkbank
+stolperte. Danach zurückgenommen: grün.
+
+**Ein Verdacht, der sich nicht bestätigt hat.** Im Browser fiel
+„BaustellenkreissÃ¤ge" auf, in der Datenbank ebenso `RÃ¼ttelplatte` und
+`NivelliergerÃ¤t` — Doppelkodierung. Das wäre vor einem Import von 200 Geräten
+ein ernster Befund gewesen. Nachgemessen: **Die Anwendung schreibt korrekt**,
+über den Browser wie über Node (`identisch: true`), und die volle
+Export-Import-Runde hält Umlaute heil (`PRUEF-Rüttelplatte Größe Ä`, Export mit
+BOM). Kaputt sind allein Altdaten aus Testläufen, die über `curl` aus Git Bash
+eingespielt wurden — dort reicht die Shell Latin-1 durch. *Werkzeugfehler in
+der Prüfumgebung, nicht im Programm; der Unterschied war eine Messung wert.*
+
+**Stand:** 357 Tests, 23 Schutzregeln, ESLint, beide Typprüfungen und die neue
+Oberflächenprüfung grün. **Jede der 37 schreibenden Routen ist bedienbar.**
+
+**Was „wasserdicht" hier nicht heißt:** Es gibt weiterhin keine
+Frontend-Unit-Tests. Die Ansichten sind im Browser abgenommen und durch die
+Oberflächenprüfung gegen die zwei häufigsten stummen Fehler abgesichert — eine
+Testumgebung für Komponenten (vitest + jsdom) wäre ein eigenes Arbeitspaket.
 
 ## Nächster Schritt
 
