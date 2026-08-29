@@ -15,6 +15,10 @@ Stand 2026-08-16. **Bewusst klein gehalten:** ~200 Maschinen, eine Handvoll Mita
 >    Anwendung bleibt und war ohnehin die tragende Schicht.
 > 2. **AP10 ist die Benutzerverwaltung geworden**, nicht das Deployment. Der
 >    Betrieb kam als AP11, das Nummernregister als AP12, der Eingang als AP13.
+>    Danach folgten noch AP14 (ESLint), AP15 (Fristenliste, Health-Check),
+>    AP16 (Prüfkette bei jedem Push, sichtbarer Sicherungsstand) und AP17
+>    (Abnahme des ganzen Pakets) — der Plan kennt sie nicht, weil sie sich
+>    erst aus dem Gebauten ergaben.
 > 3. **Ein Nummernregister** war nicht vorgesehen. Ohne es hätte die Vergabe
 >    Nummern ausgegeben, die auf noch nicht erfassten Maschinen kleben.
 

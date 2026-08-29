@@ -86,9 +86,14 @@ docker compose exec app node dist/werkzeuge/benutzer-anlegen.js \
   --name julius --rolle verwaltung
 ```
 
-Das Passwort wird abgefragt, nicht als Argument übergeben — Argumente landen
-sonst in der Shell-Historie und in der Prozessliste. Alle weiteren Konten legt
-man danach in der Oberfläche an, siehe [`BEDIENUNG.md`](BEDIENUNG.md).
+Der Befehl fragt nacheinander nach **Anzeigename**, **E-Mail** (darf leer
+bleiben) und dem **Passwort**, das zur Sicherheit zweimal einzugeben ist. Das
+Passwort ist bewusst kein Argument — Argumente landen sonst in der
+Shell-Historie und in der Prozessliste. Weil er Rückfragen stellt, gehört er
+in eine echte Sitzung; in einem Skript ohne Terminal bricht er ab.
+
+Alle weiteren Konten legt man danach in der Oberfläche an, siehe
+[`BEDIENUNG.md`](BEDIENUNG.md).
 
 Prüfen, dass wirklich alles läuft:
 
@@ -305,9 +310,32 @@ Zeitstempel; Geheimnisse werden dabei herausgefiltert.
 docker compose up -d --force-recreate app
 ```
 
+**Caddy startet nicht: `Bind for :::80 failed: port is already allocated`.**
+Auf dem Rechner läuft bereits etwas auf Port 80 oder 443 — oft ein
+mitgelieferter Webserver (Apache, nginx) oder ein anderer Docker-Stack.
+Beides gleichzeitig geht nicht; die Anwendung braucht die beiden Ports, weil
+Let's Encrypt sie zur Prüfung anspricht. Wer belegt sie?
+
+```bash
+sudo ss -tlnp '( sport = :80 or sport = :443 )'
+```
+
+Den fremden Dienst abschalten (`sudo systemctl disable --now apache2`) und
+`docker compose up -d` erneut ausführen.
+
 **App startet nicht, Protokoll zeigt `JWT_SECRET ist nur … Zeichen lang`.**
 Genau so gedacht: In Produktion verweigert die Anwendung den Start mit einem
 schwachen Geheimnis, statt eine unsichere Anmeldung anzubieten.
+
+**Die Sicherung meldet `role "tracker" does not exist`.** Die Datenbank ist
+in Ordnung — die `.env` hat Windows-Zeilenenden. Die Skripte fangen das
+inzwischen selbst ab; bei einer älteren Fassung hilft:
+
+```bash
+sed -i 's/\r$//' .env
+```
+
+Prüfen lässt es sich mit `file .env` — steht dort „CRLF", ist es das.
 
 **Anmeldung schlägt fehl, obwohl das Passwort stimmt.** Nach zehn
 Fehlversuchen sperrt sich ein Konto für 15 Minuten — auch für das richtige

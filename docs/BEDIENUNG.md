@@ -187,3 +187,27 @@ npm run benutzer:anlegen -- --name julius --rolle verwaltung
 
 Bewusst kein Einrichtungsassistent im Web: Eine offen erreichbare Seite, an der
 sich das erste Konto anlegen lässt, ist ein Wettrennen, das man verlieren kann.
+
+---
+
+# Läuft die Datensicherung?
+
+Unter **Mehr → Verwaltung → Datensicherung** steht, wann zuletzt gesichert
+wurde. Sichtbar ist das nur mit dem Recht *Benutzer verwalten* — den Zustand
+der Anlage geht einen Mitarbeiter auf der Baustelle nichts an.
+
+| Anzeige | Bedeutung |
+|---|---|
+| Grün, „heute gesichert" | Alles in Ordnung |
+| Gelb, „vor 1–2 Tagen" | Noch unkritisch, aber im Auge behalten |
+| **Rot, „vor 3 Tagen oder länger"** | Die nächtliche Sicherung läuft nicht mehr |
+| **Rot, „letzter Lauf fehlgeschlagen"** | Sie ist gelaufen und abgebrochen |
+| **Rot, „noch nie gesichert"** | Der cron-Eintrag fehlt noch |
+
+**Warum das hier steht und nicht in einer Mail:** Diese Anwendung verschickt
+bewusst keine Mails — kein Mailserver, kein Passwort, das irgendwo hinterlegt
+sein muss. Die Meldung nimmt deshalb den umgekehrten Weg: Sie steht in der
+App, und wer sie öffnet, sieht sie.
+
+Ist die Anzeige rot, hilft [`BETRIEB.md`](BETRIEB.md) weiter — dort stehen der
+cron-Eintrag und die häufigen Ursachen.

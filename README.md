@@ -116,7 +116,16 @@ Statische Prüfung von Server, Tests und Oberfläche:
 ```bash
 npm run lint             # ESLint über src/, tests/, scripts/, web/src/
 npm run lint:fix         # was sich von selbst beheben lässt
+npm run pruefe           # Typen des Servers (tsc)
+npm --prefix web run pruefe   # Typen der Oberfläche (vue-tsc)
 ```
+
+*Nicht `npx vue-tsc` aufrufen — das lädt eine fremde Fassung aus dem Netz und
+meldet einen `baseUrl`-Fehler, den das Projekt mit seiner eigenen nicht hat.*
+
+Dieselbe Kette läuft bei jedem Push automatisch in GitHub Actions
+(`.github/workflows/pruefung.yml`), dort gegen eine **leere** Datenbank — das
+fängt Tests, die nur auf einem gewachsenen Bestand grün sind.
 
 Zum Ansehen mit Inhalt: `node scripts/beispieldaten.mjs <name> <passwort>`
 legt 12 Geräte, 4 Orte, 4 Regale und ein paar Buchungen an.

@@ -4,11 +4,11 @@ Web-Anwendung für Handy und iPad: Baumaschinen mit vorhandenen 1D-Strichcode-Et
 scannen, ausgeben, zurücknehmen — mit lückenloser Historie, wer ein Gerät wann auf
 welche Baustelle gebracht hat.
 
-**Stand: 2026-08-23 — AP1 bis AP16 fertig, als Docker-Paket lauffähig.** Anmelden, scannen, ausgeben,
+**Stand: 2026-08-28 — AP1 bis AP17 fertig, als Docker-Paket abgenommen.** Anmelden, scannen, ausgeben,
 zurücknehmen, umbuchen; Fotos und Dokumente; Prüfungen; Schäden; Zubehör;
 Geräte anlegen und bearbeiten, Import/Export als Tabelle, Etikettendruck;
 **Benutzerverwaltung in der Oberfläche mit frei zusammenstellbaren Rollen.**
-**Läuft als zwei Docker-Container auf dem Mini-PC** — Aufsetzen, Sicherung und
+**Läuft als drei Docker-Container auf dem Mini-PC** (Caddy, Anwendung, Datenbank) — Aufsetzen, Sicherung und
 Fehlersuche: [`docs/BETRIEB.md`](docs/BETRIEB.md).
 Vollständiger Plan: [`docs/PLAN.md`](docs/PLAN.md),
 Bedienung der Benutzerverwaltung: [`docs/BEDIENUNG.md`](docs/BEDIENUNG.md).
@@ -390,6 +390,8 @@ damit sich die Anlage **vor Ort** prüfen lässt.
 
 **Geprüft, nicht vermutet** (alles in WSL Ubuntu-24.04 gegen einen echten Klon):
 Bau aus dem Repo · Start beider Container bis `healthy` · alle neun Migrationen
+*(Stand 2026-08-19: neun Migrationen, zwei Container — Caddy kam mit AP13,
+Migration 010 mit AP12 dazu.)*
 von selbst · erstes Konto im Container · **alle sechs Durchläufe im Container** ·
 19 Schutzregeln · läuft als uid 1000 · Datenbank nicht von außen erreichbar ·
 `down`/`up` ohne Datenverlust · **Update-Weg** (`git pull` + `--build`) ohne
@@ -638,6 +640,102 @@ Fehlermeldung über eine Nebensache. *Der erste Testlauf schlug fehl, weil die
 Datei aus einem Handtest noch dalag: Aufgeräumt wurde nach jedem Test, nötig
 war es davor.*
 
+## AP17 — Abnahme des ganzen Pakets (2026-08-28)
+
+Eine Durchsicht des fertigen Stands: alles noch einmal geprüft, die Doku gegen
+den Code gemessen und die Installation von Null durchgespielt. **Drei echte
+Fehler, alle in Prüfwerkzeugen** — und genau deshalb schwer wiegend: Ein
+Prüfwerkzeug, das falsch meldet, kostet entweder Vertrauen oder deckt etwas zu.
+
+**1. Der erste Lauf der neuen Prüfkette war rot** — und hatte recht.
+`api-nummernregister.test.ts` rechnete die nächste Nummer als
+`höchste + 1`. In einer frischen Datenbank ist die höchste Nummer aber
+`null`, der Test erwartete `00001`; die Anwendung vergibt korrekt `10001`,
+weil der Nummernkreis bei 10000 beginnt. **Der Test war nur grün, weil die
+Entwicklungsdatenbank längst gewachsen ist.** Die Regel selbst war getestet
+(`domain-barcode.test.ts` prüft `naechsteNummer(null) === "10001"`) — der
+Integrationstest kannte sie nur nicht. Genau der Fehler, für den eine
+Werkbank da ist, die jedes Mal bei Null anfängt.
+
+**2. Die Schemaprüfung meldete bei jeder Erstinstallation einen Mangel.**
+Sie fragt unter anderem, ob der Seed ein Benutzerkonto anlegt (er darf
+nicht). Ob die Datenbank noch unbenutzt ist, maß sie an Geräten und
+Buchungen — **Konten zählten nicht mit**. Der dokumentierte Weg legt aber
+erst das Verwaltungskonto an und ruft dann die Prüfung: Sie fand das gerade
+angelegte Konto und meldete „erwartet 0, gefunden 1". Wer der Anleitung
+folgte, bekam beim ersten Aufsetzen eine rote Zeile zu sehen — an der
+Stelle, an der das Werkzeug Vertrauen schaffen soll.
+
+**3. Der Schutz gegen doppelte Nummern wurde gar nicht geprüft.** Die
+Prüfung nahm eine vorhandene Nummer und trug sie erneut ein:
+`INSERT INTO etikettennummern … SELECT nummer FROM etikettennummern LIMIT 1`.
+Auf einer frischen Anlage ist das Register leer, der SELECT traf null Zeilen,
+der INSERT lief fehlerfrei durch — und die Prüfung meldete „wurde NICHT
+abgelehnt". Sie brachte also einen Mangel zur Anzeige, den es nicht gab, und
+hätte einen echten nicht bemerkt. Sie bringt ihre Zeile jetzt selbst mit.
+*Gegengeprüft: Primärschlüssel entfernt → rot, wieder angelegt → grün.*
+
+**Der Schutz selbst war nie defekt** — `nummer` ist Primärschlüssel, ein
+zweiter Eintrag wird von Postgres abgewiesen (direkt an der Datenbank
+nachgemessen). Kaputt war nur das Werkzeug, das es belegen sollte.
+
+**4. Die Sicherung lief nicht, sobald die `.env` unter Windows bearbeitet
+wurde.** Der schwerwiegendste Fund, weil er die letzte Verteidigungslinie
+trifft. `wert_aus_env` liest die Zugangsdaten per `sed` aus der `.env`; hängt
+dort ein Wagenrücklauf an, bekommt `pg_dump` den Benutzer `tracker\r` und
+Postgres antwortet `role "tracker" does not exist`. **Das `\r` ist in der
+Meldung unsichtbar** — man sucht den Fehler in der Datenbank, in den
+Berechtigungen, in Compose, nur nicht in den Zeilenenden. Im Repo steht die
+Vorlage dank `.gitattributes` mit LF, auf dem Mini-PC tritt es beim strikten
+Befolgen der Anleitung also nicht auf; wer die `.env` aber am Windows-Rechner
+mit Passwörtern befüllt und hinüberkopiert, steht ohne Sicherung da — und
+merkt es erst, wenn er sie braucht. Beide Skripte entfernen den Wagenrücklauf
+jetzt selbst. *Gegengeprüft mit genau der `.env`, an der es scheiterte.*
+
+**5. Die Rückspielung überging eine fehlende Dateisicherung stumm.** Der
+abgebrochene Lauf aus Befund 4 hinterließ einen halben Stand: Datenbank ja,
+Fotos nein. `if [ -f "$DATEI_DATEI" ]` sprang ohne `else` darüber — die
+Wiederherstellung meldete „Fertig", während jeder Fotoeintrag ins Leere zeigte.
+Jetzt eine deutliche Warnung mit dem fehlenden Dateinamen.
+
+**Und ein Fund in der eigenen Arbeit:** Der Fix zu Befund 4 stand zuerst als
+**echtes Steuerzeichen** im Skript (`tr -d '<CR>'` statt `tr -d '\r'`).
+Funktioniert — aber unsichtbar, und ein Kopiervorgang hätte es stillschweigend
+verschluckt. Damit wäre die Härtung wirkungslos gewesen, ohne dass irgendwo
+etwas rot geworden wäre. *Das ist in diesem Projekt jetzt das dritte Mal:
+BOM im Quelltext (AP14), CRLF im Container (AP11), und nun dies. Die Lehre von
+AP14 gilt unverändert — gleiche Wirkung, aber sichtbar geschrieben.*
+
+**Was die Abnahme sonst bestätigt hat** (frische Installation in WSL, drei
+Container aus dem gebauten Abbild): alle zehn Migrationen laufen von selbst ·
+erstes Konto über die Kommandozeile inklusive Leck-Abgleich · Rauchtest
+10 von 10 · **23 Schutzregeln, diesmal samt der drei Seed-Regeln, die nur auf
+einer unbenutzten Datenbank etwas aussagen** · alle sechs Durchläufe · die
+erste vergebene Nummer ist 10001 · HTTPS über Caddy mit selbst ausgestelltem
+Zertifikat, Cookie mit `HttpOnly; Secure; SameSite=Strict` · Datenbank ohne
+Host-Port · Anwendung als uid 1000 · **Rückspielweg nach `down -v`**: nach
+vollständigem Verlust beider Volumes waren 28 Geräte, 4 Buchungen, 2 Konten,
+30 Nummern und die Fotos wieder da, die Anmeldung lieferte 200 · Update-Weg
+ohne Datenverlust · 357 Tests gegen eine frische Datenbank.
+
+**Zwei Prüfungen, die es vorher nicht gab**, beide ohne Befund: Jeder der
+38 Aufrufe der Oberfläche trifft eine der 70 registrierten Routen, und keine
+Ansicht ist unerreichbar. Die zweite Frage hatte bei AP15 die vergessene
+Fristenliste zutage gefördert — deshalb prüft sie jetzt ein Skript statt eines
+Zufalls.
+
+**Doku gegen den Code gemessen:** „zwei Docker-Container" stimmte seit AP13
+nicht mehr (Caddy kam dazu), und die Konventionen empfahlen `npx vue-tsc` —
+das lädt eine fremde Fassung aus dem Netz und meldet einen `baseUrl`-Fehler,
+den das Projekt gar nicht hat. Richtig ist `npm --prefix web run pruefe`.
+Rechte (13), Rollenumfänge (3/9/13) und alle Querverweise stimmten.
+
+**In die Betriebsanleitung aufgenommen:** der Portkonflikt (`Bind for :::80
+failed`) samt Befehl, um den Belegern auf die Spur zu kommen — auf einem
+Mini-PC mit vorinstalliertem Webserver der wahrscheinlichste Stolperstein beim
+ersten Start; und dass der Kontobefehl Rückfragen stellt und deshalb eine
+echte Sitzung braucht.
+
 ## Nächster Schritt
 
 **Kamera-Abnahme am echten Etikett** mit iPad und Android — braucht die
@@ -652,7 +750,9 @@ Aufkleber drucken.
 - Deutsch in Doku, Kommentaren, UI und Commit-Messages; englische Bezeichner im Code,
   wo üblich. Fachbegriffe der Domäne (`geraete`, `buchungen`, `standorte`) auf Deutsch.
 - Vor jedem Commit: `npx tsc --noEmit`, `npm run lint`, `npm test`, ab Frontend
-  zusätzlich `npx vue-tsc`.
+  zusätzlich `npm --prefix web run pruefe` (vue-tsc).
+  *Nicht `npx vue-tsc`: Das zieht eine fremde Version aus dem Netz und meldet
+  einen `baseUrl`-Fehler, den das Projekt mit seiner eigenen Fassung nicht hat.*
 - **Kein Push ohne ausdrückliche Aufforderung.** `.claude/` und `.env` nie committen.
 - Migrationen forward-only, nummeriert, idempotent. Buchungen sind append-only —
   die Datenbank verweigert `UPDATE` und `DELETE` per Rule.
