@@ -211,3 +211,37 @@ App, und wer sie öffnet, sieht sie.
 
 Ist die Anzeige rot, hilft [`BETRIEB.md`](BETRIEB.md) weiter — dort stehen der
 cron-Eintrag und die häufigen Ursachen.
+
+---
+
+# Eine neue Baustelle anlegen
+
+Zwei Wege, je nachdem, wo Sie gerade sind. Beide brauchen das Recht
+*Stammdaten pflegen*.
+
+**Beim Buchen** — der übliche Fall: Sie geben ein Gerät aus, die Baustelle
+steht noch nicht in der Liste. Unter der Auswahl „Wohin geht das Gerät?"
+tippen Sie auf **„Baustelle ist noch nicht dabei"**, tragen den Namen ein und
+bestätigen mit **Anlegen und wählen**. Die Baustelle ist damit angelegt,
+sofort ausgewählt, und Sie buchen weiter. Kein Umweg über die Verwaltung.
+
+**Unter „Orte"** — wenn Sie mehrere auf einmal einrichten: **„Neue Baustelle
+anlegen"**, dann Name, Art und optional die Adresse. Nach dem Speichern bleibt
+das Formular offen und die Art stehen, sodass die nächste gleich folgen kann.
+
+Einmal angelegt, steht eine Baustelle **überall** zur Auswahl, ohne dass
+irgendetwas neu geladen werden muss.
+
+**Wenn ein Hinweis erscheint** („Es gibt bereits ‚Bauhof Nord'."), prüfen Sie
+kurz, ob es derselbe Ort ist. Der Hinweis hält Sie nicht auf — es kann ja eine
+zweite Baustelle in derselben Straße sein. Er soll nur verhindern, dass mit
+der Zeit „Lindengasse", „Lindengasse 14" und „lindengasse" nebeneinander
+stehen und sich der Bestand auf drei Orte verteilt, die dasselbe meinen.
+
+**Eine Baustelle wird nie gelöscht, sondern stillgelegt** — ihr Name steht in
+jeder Buchung, die dorthin ging, und die Historie muss stimmen. Stillgelegte
+Orte verschwinden aus den Auswahlfeldern.
+
+*Lagerplätze, Schlagworte und Prüfarten lassen sich derzeit noch nicht in der
+Oberfläche anlegen — dafür braucht es die Schnittstelle. Siehe
+[`BETRIEB.md`](BETRIEB.md).*

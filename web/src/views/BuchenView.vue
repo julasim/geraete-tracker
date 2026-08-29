@@ -6,12 +6,12 @@
  * Serienausgabe ist der Normalfall beim Bestücken eines Transporters,
  * deshalb führt die Bestätigung direkt zurück zum Scanner.
  */
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { api, ApiError } from "@/api";
 import { useAnmeldung } from "@/stores/anmeldung";
 import { useBestand } from "@/stores/bestand";
-import type { Buchungsart, Geraet } from "@/typen";
+import type { Buchungsart, Geraet, Standort } from "@/typen";
 import Kopf from "@/components/Kopf.vue";
 import StatusChip from "@/components/StatusChip.vue";
 import Symbol from "@/components/Symbol.vue";
@@ -34,6 +34,68 @@ const fertig = ref(false);
 
 const standortId = ref("");
 const lagerplatzId = ref("");
+
+/**
+ * Eine Baustelle anlegen, ohne den Buchungsvorgang zu verlassen.
+ *
+ * Der Fall aus der Praxis: Ein Auftrag ist neu, das Gerät steht schon auf dem
+ * Hänger, und die Baustelle gibt es im System noch nicht. Wer dafür in die
+ * Verwaltung wechseln müsste, bucht am Ende gar nicht oder auf den falschen
+ * Ort — und dann stimmt der Bestand nicht mehr, was in dieser Anwendung der
+ * teuerste Fehler überhaupt ist.
+ *
+ * Nur mit dem Recht `stammdaten.pflegen`; wer es nicht hat, sieht die
+ * Auswahl wie bisher.
+ */
+const neuerOrtOffen = ref(false);
+const neuerOrtName = ref("");
+const neuerOrtLaeuft = ref(false);
+const neuerOrtFehler = ref<string | null>(null);
+const neuerOrtEl = ref<HTMLInputElement | null>(null);
+
+const darfOrteAnlegen = computed(() => anmeldung.darf("stammdaten.pflegen"));
+
+/** Warnt vor Dubletten, bevor gespeichert wird (siehe OrteView). */
+const aehnlicherOrt = computed(() => {
+  const eingabe = neuerOrtName.value.trim().toLowerCase();
+  if (eingabe.length < 3) return null;
+  return (
+    bestand.standorte.find((s) => {
+      const name = s.name.toLowerCase();
+      return name === eingabe || name.includes(eingabe) || eingabe.includes(name);
+    }) ?? null
+  );
+});
+
+async function neuerOrtZeigen(): Promise<void> {
+  neuerOrtOffen.value = true;
+  neuerOrtFehler.value = null;
+  await nextTick();
+  neuerOrtEl.value?.focus();
+}
+
+async function neuenOrtAnlegen(): Promise<void> {
+  const name = neuerOrtName.value.trim();
+  if (neuerOrtLaeuft.value || !name) return;
+  neuerOrtLaeuft.value = true;
+  neuerOrtFehler.value = null;
+
+  try {
+    const neu = await api.post<Standort>("/standorte", { name, typ: "baustelle" });
+    bestand.ergaenzeStandort(neu);
+    // Direkt auswählen: Genau dorthin wollte der Benutzer ja buchen.
+    standortId.value = neu.id;
+    neuerOrtOffen.value = false;
+    neuerOrtName.value = "";
+  } catch (e) {
+    neuerOrtFehler.value =
+      e instanceof ApiError
+        ? e.message
+        : "Die Baustelle konnte nicht angelegt werden. Bitte noch einmal versuchen.";
+  } finally {
+    neuerOrtLaeuft.value = false;
+  }
+}
 const empfaengerId = ref("");
 const empfaengerFrei = ref("");
 const fremdfirma = ref(false);
@@ -168,6 +230,58 @@ async function buchen(): Promise<void> {
           <select id="ort" v-model="standortId" class="pt-feld">
             <option v-for="s in zielOrte" :key="s.id" :value="s.id">{{ s.name }}</option>
           </select>
+
+          <!--
+            Nur beim Hinausgeben: Ins Lager zurück geht es an einen Ort, den
+            es längst gibt — dort wäre der Knopf nur im Weg.
+          -->
+          <template v-if="!istRuecknahme && darfOrteAnlegen">
+            <button
+              v-if="!neuerOrtOffen"
+              type="button"
+              class="pt-btn pt-btn--still neuer-ort__auf"
+              @click="neuerOrtZeigen"
+            >
+              <Symbol name="plus" :groesse="18" /> Baustelle ist noch nicht dabei
+            </button>
+
+            <div v-else class="neuer-ort">
+              <label class="pt-label" for="neuer-ort-name">Neue Baustelle</label>
+              <input
+                id="neuer-ort-name"
+                ref="neuerOrtEl"
+                v-model="neuerOrtName"
+                class="pt-feld"
+                maxlength="120"
+                placeholder="z. B. Lindengasse 14"
+                autocomplete="off"
+                @keyup.enter="neuenOrtAnlegen"
+              />
+              <p v-if="aehnlicherOrt" class="pt-meldung pt-meldung--warnung">
+                Es gibt bereits „{{ aehnlicherOrt.name }}“. Ist das derselbe Ort?
+              </p>
+              <p v-if="neuerOrtFehler" class="pt-meldung pt-meldung--fehler">
+                {{ neuerOrtFehler }}
+              </p>
+              <div class="neuer-ort__knoepfe">
+                <button
+                  type="button"
+                  class="pt-btn pt-btn--still"
+                  @click="neuerOrtOffen = false"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  type="button"
+                  class="pt-btn pt-btn--primaer"
+                  :disabled="neuerOrtLaeuft || !neuerOrtName.trim()"
+                  @click="neuenOrtAnlegen"
+                >
+                  {{ neuerOrtLaeuft ? "Wird angelegt …" : "Anlegen und wählen" }}
+                </button>
+              </div>
+            </div>
+          </template>
         </div>
 
         <div v-if="plaetze.length" class="feldgruppe">
@@ -327,5 +441,24 @@ async function buchen(): Promise<void> {
 }
 .fertig__ziel {
   margin: var(--space-4) 0;
+}
+.neuer-ort__auf {
+  margin-top: var(--space-2);
+  align-self: flex-start;
+}
+.neuer-ort {
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  background: var(--surface-subtle);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.neuer-ort__knoepfe {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
 }
 </style>

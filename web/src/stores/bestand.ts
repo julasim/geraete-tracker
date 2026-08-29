@@ -53,6 +53,20 @@ export const useBestand = defineStore("bestand", () => {
     }
   }
 
+  /**
+   * Einen neu angelegten oder geänderten Standort einpflegen.
+   *
+   * Ohne das müsste der ganze Bestand neu geladen werden, damit eine gerade
+   * angelegte Baustelle in den Auswahlfeldern auftaucht — bei rund 200
+   * Geräten ein spürbarer Aufruf, und auf der Baustelle einer über Mobilfunk.
+   * So steht sie sofort überall zur Verfügung, wo Standorte gewählt werden.
+   */
+  function ergaenzeStandort(standort: Standort): void {
+    const i = standorte.value.findIndex((s) => s.id === standort.id);
+    if (i >= 0) standorte.value[i] = standort;
+    else standorte.value.push(standort);
+  }
+
   /** Ein einzelnes Gerät nach einer Buchung auffrischen. */
   function ersetze(geraet: Geraet): void {
     const i = geraete.value.findIndex((g) => g.id === geraet.id);
@@ -111,6 +125,7 @@ export const useBestand = defineStore("bestand", () => {
     zahlen,
     laden,
     ersetze,
+    ergaenzeStandort,
     nachId,
     plaetzeAmStandort,
     suche,

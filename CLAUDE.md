@@ -4,7 +4,7 @@ Web-Anwendung für Handy und iPad: Baumaschinen mit vorhandenen 1D-Strichcode-Et
 scannen, ausgeben, zurücknehmen — mit lückenloser Historie, wer ein Gerät wann auf
 welche Baustelle gebracht hat.
 
-**Stand: 2026-08-28 — AP1 bis AP17 fertig, als Docker-Paket abgenommen.** Anmelden, scannen, ausgeben,
+**Stand: 2026-08-29 — AP1 bis AP18 fertig, als Docker-Paket abgenommen.** Anmelden, scannen, ausgeben,
 zurücknehmen, umbuchen; Fotos und Dokumente; Prüfungen; Schäden; Zubehör;
 Geräte anlegen und bearbeiten, Import/Export als Tabelle, Etikettendruck;
 **Benutzerverwaltung in der Oberfläche mit frei zusammenstellbaren Rollen.**
@@ -735,6 +735,71 @@ failed`) samt Befehl, um den Belegern auf die Spur zu kommen — auf einem
 Mini-PC mit vorinstalliertem Webserver der wahrscheinlichste Stolperstein beim
 ersten Start; und dass der Kontobefehl Rückfragen stellt und deshalb eine
 echte Sitzung braucht.
+
+## AP18 — Baustellen anlegen, wo man sie braucht (2026-08-29)
+
+Julius' Frage beim ersten Zugriff vom Handy: „Wie lege ich Projekte an?" Die
+Antwort war unangenehm: **gar nicht.** `POST /standorte` gab es seit AP4, mit
+Rechteprüfung und Tests — nur rief es keine Ansicht auf. `OrteView` zeigte
+Standorte an und listete ihren Bestand, mehr nicht. Dasselbe gilt weiterhin
+für Lagerplätze, Schlagworte und Prüfarten.
+
+**Warum es nie auffiel:** Die sechs Durchläufe und die Beispieldaten legen
+Standorte selbst an. Wer die Anwendung zum Ausprobieren öffnet, findet immer
+schon welche vor. Die Lücke zeigt sich erst, wenn jemand eine neue Baustelle
+braucht — also im ersten echten Arbeitstag.
+
+**Und die Abnahme von AP17 hat sie übersehen.** Dort stand „keine toten
+Endpunkte"; die Suche zählte aber Tests und Durchlauf-Skripte mit, und die
+rufen `POST /standorte` auf. Die richtige Frage lautet: *Ruft die Oberfläche
+es auf?* Ein zweiter Anlauf lieferte ebenfalls Unsinn, weil die Oberfläche
+neunmal direktes `fetch()` statt `api.post()` verwendet und das Muster daran
+vorbeigriff. Belastbar wurde es erst durch direktes Nachsehen.
+*Merksatz: Wer prüft, ob etwas benutzt wird, muss sagen — von wem.*
+
+**Gebaut, an zwei Stellen:**
+
+1. **`OrteView`** — „Neue Baustelle anlegen" mit Name, Art und Adresse. Nach
+   dem Speichern bleibt das Formular offen und der Typ stehen: Beim
+   Ersteinrichten legt man mehrere am Stück an.
+2. **`BuchenView`** — „Baustelle ist noch nicht dabei" direkt unter der
+   Zielauswahl. Der Fall aus der Praxis: Der Auftrag ist neu, das Gerät steht
+   schon auf dem Hänger. Wer dafür die Buchung verlassen müsste, bucht am Ende
+   gar nicht oder auf den falschen Ort — und **falscher Bestand ist in dieser
+   Anwendung der teuerste Fehler.** Der neue Ort wird sofort ausgewählt.
+   Nur beim Hinausgeben; ins Lager zurück geht es an Orte, die es längst gibt.
+
+Beides nur mit `stammdaten.pflegen`. Ein neuer Ort landet über
+`bestand.ergaenzeStandort()` sofort im Store und steht damit in **jedem**
+Auswahlfeld, ohne dass die ~200 Geräte neu geladen werden.
+
+**Gegen Dubletten:** Ein Hinweis erscheint, bevor gespeichert wird, sobald der
+Name einem vorhandenen Ort ähnelt („Es gibt bereits ‚Bauhof Nord'."). Er
+blockiert nicht — es kann ja ein anderer Ort sein. Ohne das entstünden mit der
+Zeit „Lindengasse", „Lindengasse 14" und „lindengasse" nebeneinander, und der
+Bestand verteilte sich auf drei Orte, die dasselbe meinen; die Datenbank
+verhindert nur exakte Dubletten unter den aktiven Orten.
+
+**Der Fund beim Bauen — erfundene Klassennamen.** Der erste Entwurf benutzte
+`pt-knopf`, `pt-knopf--weit` und `pt-knopf--still`. **Keine davon existiert**;
+die Klassen heißen `pt-btn`, `pt-btn--breit`, `pt-btn--still`. Ebenso
+`var(--radius-1)` statt `--radius-md`. Weder `vue-tsc` noch ESLint schlagen
+hier an: CSS-Klassen sind für sie bloße Zeichenketten. Das Formular wäre
+vollständig ungestaltet ausgeliefert worden — genau der Befund, der in PATIO
+dazu führte, dass **zehn Ansichten seit ihrem Bau ungestaltet liefen**.
+Gefunden durch einen Abgleich jeder benutzten Klasse und jeder CSS-Variablen
+gegen `basis.css`/`tokens.css`; seither: 26 bzw. 31 Klassen, alle vorhanden.
+
+**Im Browser abgenommen:** Formular öffnet · Dublettenwarnung erscheint bei
+„Bauhof" · „Prüfbaustelle Wienerberg" angelegt, steht **ohne Neuladen** in der
+Liste (32 → 34 aktiv) · in `BuchenView` „Prüfbaustelle Donaufeld" aus dem
+Buchungsvorgang heraus angelegt und **sofort ausgewählt** · Gerät darauf
+gebucht, Status „ausgegeben". Prüfspuren danach zurückgebucht und die beiden
+Orte stillgelegt.
+
+**Noch offen:** Lagerplätze, Schlagworte und Prüfarten lassen sich weiterhin
+nur über die API pflegen. Prüfarten braucht man einmal beim Einrichten,
+Schlagworte gelegentlich — Baustellen waren der dringende Fall.
 
 ## Nächster Schritt
 
