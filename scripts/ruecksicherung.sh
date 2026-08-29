@@ -39,7 +39,12 @@ DATEI_DATEI="$ZIEL/dateien_$STEMPEL.tar.gz"
 # "INFRA: command not found" ab. Beim Bau genau so passiert.
 wert_aus_env() {
   [ -f .env ] || return 0
-  sed -n "s/^$1=//p" .env | tail -1 | sed 's/^"//; s/"$//'
+  # tr -d '\r': Wurde die .env unter Windows bearbeitet, hängt an jedem Wert
+  # ein Wagenrücklauf. pg_dump bekäme dann den Benutzer "tracker\r" und
+  # antwortet mit `role "tracker" does not exist` — das \r ist in der Meldung
+  # unsichtbar, und man sucht den Fehler stundenlang in der Datenbank statt in
+  # den Zeilenenden. Beim Abnahmetest genau so passiert.
+  sed -n "s/^$1=//p" .env | tail -1 | tr -d '\r' | sed 's/^"//; s/"$//'
 }
 DB_BENUTZER="$(wert_aus_env POSTGRES_USER)"; DB_BENUTZER="${DB_BENUTZER:-tracker}"
 DB_NAME="$(wert_aus_env POSTGRES_DB)";      DB_NAME="${DB_NAME:-tracker}"
@@ -63,6 +68,19 @@ if [ -f "$DATEI_DATEI" ]; then
   # ohne die Anwendung starten.
   docker compose run --rm --no-deps -T --user root --entrypoint sh app \
     -c 'rm -rf /data/* && tar -xzf - -C /data && chown -R node:node /data' < "$DATEI_DATEI"
+else
+  # Nicht stillschweigend uebergehen: Eine abgebrochene Sicherung kann die
+  # Datenbank ohne die zugehoerigen Dateien hinterlassen. Wer das nicht
+  # erfaehrt, haelt die Wiederherstellung fuer vollstaendig - dabei zeigt
+  # jeder Fotoeintrag ins Leere. Bei der Abnahme lag genau so ein halber
+  # Stand im Ordner.
+  echo
+  echo "  ACHTUNG: Zu diesem Stand gibt es KEINE Dateisicherung."
+  echo "  ($DATEI_DATEI fehlt.)"
+  echo "  Die Datenbank ist eingespielt, aber Fotos und Dokumente FEHLEN."
+  echo "  Liegt ein vollstaendigerer Stand vor, diesen verwenden:"
+  echo "    ./scripts/ruecksicherung.sh"
+  echo
 fi
 
 echo "App wieder starten …"

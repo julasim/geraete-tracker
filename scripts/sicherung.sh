@@ -75,7 +75,12 @@ mkdir -p "$ZIEL"
 # "INFRA: command not found" ab. Beim Bau genau so passiert.
 wert_aus_env() {
   [ -f .env ] || return 0
-  sed -n "s/^$1=//p" .env | tail -1 | sed 's/^"//; s/"$//'
+  # tr -d '\r': Wurde die .env unter Windows bearbeitet, hängt an jedem Wert
+  # ein Wagenrücklauf. pg_dump bekäme dann den Benutzer "tracker\r" und
+  # antwortet mit `role "tracker" does not exist` — das \r ist in der Meldung
+  # unsichtbar, und man sucht den Fehler stundenlang in der Datenbank statt in
+  # den Zeilenenden. Beim Abnahmetest genau so passiert.
+  sed -n "s/^$1=//p" .env | tail -1 | tr -d '\r' | sed 's/^"//; s/"$//'
 }
 DB_BENUTZER="$(wert_aus_env POSTGRES_USER)"; DB_BENUTZER="${DB_BENUTZER:-tracker}"
 DB_NAME="$(wert_aus_env POSTGRES_DB)";      DB_NAME="${DB_NAME:-tracker}"
