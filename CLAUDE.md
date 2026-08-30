@@ -4,7 +4,7 @@ Web-Anwendung für Handy und iPad: Baumaschinen mit vorhandenen 1D-Strichcode-Et
 scannen, ausgeben, zurücknehmen — mit lückenloser Historie, wer ein Gerät wann auf
 welche Baustelle gebracht hat.
 
-**Stand: 2026-08-29 — AP1 bis AP19 fertig, als Docker-Paket abgenommen.** Anmelden, scannen, ausgeben,
+**Stand: 2026-08-30 — AP1 bis AP20 fertig, als Docker-Paket abgenommen.** Anmelden, scannen, ausgeben,
 zurücknehmen, umbuchen; Fotos und Dokumente; Prüfungen; Schäden; Zubehör;
 Geräte anlegen und bearbeiten, Import/Export als Tabelle, Etikettendruck;
 **Benutzerverwaltung in der Oberfläche mit frei zusammenstellbaren Rollen.**
@@ -869,6 +869,69 @@ Oberflächenprüfung grün. **Jede der 37 schreibenden Routen ist bedienbar.**
 Frontend-Unit-Tests. Die Ansichten sind im Browser abgenommen und durch die
 Oberflächenprüfung gegen die zwei häufigsten stummen Fehler abgesichert — eine
 Testumgebung für Komponenten (vitest + jsdom) wäre ein eigenes Arbeitspaket.
+
+## AP20 — Durchsicht der Oberfläche im Handyformat (2026-08-30)
+
+Gemessen statt geschätzt, bei 375x812 im Browser.
+
+**Was trägt:** Der ganze Bestand kostet **12,4 KB gzip** (290 Geräte, 161 KB
+roh), alle vier Startabfragen zusammen rund 15 KB — weniger als ein einzelnes
+Baustellenfoto. Der Entwurf „alles laden, im Browser filtern" ist damit für
+diese Größenordnung belegt, nicht bloß behauptet. Das 1-MB-WASM des
+Barcode-Lesers wird **erst beim Scannen** nachgeladen (dynamischer Import),
+Ansichten werden einzeln nachgeladen, und der Hauptweg „Gerät ausgeben"
+braucht **zwei Tipper**, weil Ziel und Person vorbelegt sind.
+
+**Vier Befunde, alle behoben:**
+
+1. **Die Filterleiste war das kleinste Tippziel der Anwendung** — 37 px,
+   der „Neu"-Knopf 40 px, gegen die eigene Vorgabe von 48 px („Daumen statt
+   Maus, teils mit Handschuhen"). Jetzt 48 px; **alle** Tippziele liegen
+   darüber. *Beim Beheben zunächst überschossen: Mit größerem seitlichen
+   Abstand wurden die vier Filter zusammen breiter als der Bildschirm und
+   „Defekt" rutschte hinaus. Die Leiste scrollt zwar, aber ein Filter, den
+   man erst heranziehen muss, wird nicht benutzt — korrigiert gehörte die
+   Höhe, nicht die Breite.*
+
+2. **Die Trefferliste war falsch sortiert.** Bei Eingabe von `1001` kamen
+   10011, 10010, 10015, 10016 — alphabetisch nach Bezeichnung. Wer eine
+   Nummer vom Etikett abtippt (der Normalfall bei streikender Kamera oder
+   verschmutztem Etikett), sucht die Nummer. `suche()` sortiert reine
+   Ziffern jetzt numerisch, Präfix-Treffer zuerst; die Zahl wird als Zahl
+   verglichen, sonst käme 10100 vor 10011. Nachgemessen: 10010, 10011,
+   10012, 10013 …
+
+3. **Der Sucher belegte die halbe Höhe, auch ohne Kamera.** Verweigert der
+   Browser den Zugriff, blieb ein leerer schwarzer Block über 46 % der Höhe
+   stehen — ausgerechnet im Handeingabe-Fall, wo die Trefferliste den Platz
+   braucht. Er schrumpft jetzt auf die Meldung. **Ausdrücklich nicht** bei
+   „startet" oder „aus": Dort kommt die Kamera gleich, und ein springendes
+   Layout unter dem Daumen ist schlimmer als ein Moment ungenutzter Fläche.
+   *Dabei selbst einen Fehler gebaut: Die absolut positionierten Licht- und
+   Tastatur-Knöpfe lagen danach über der Meldung. Ohne Kamera sind beide
+   gegenstandslos — Licht schaltet nichts, die Handeingabe steht schon offen
+   — und entfallen jetzt.*
+
+4. **Die inaktiven Reiter der Hauptnavigation** standen auf `--fg-subtle`:
+   **2,56:1** bei 11 px, bei Sonnenlicht kaum zu lesen. Jetzt `--fg-muted`
+   mit **7,73:1** (Norm 4,5); der aktive Reiter bleibt mit 19,8:1 klar
+   abgesetzt.
+
+**Eine Korrektur in eigener Sache — und eine Lehre über das Messen.**
+Zwischendurch hatte diese Durchsicht gemeldet, die aktive Navigation
+funktioniere nicht: Alle vier Reiter zeigten dieselbe Farbe. **Das war
+falsch.** Die Messungen liefen über `javascript_tool` in einem isolierten
+Kontext, in dem selbst ein `!important`-Inline-Stil nicht ankam — die Werte
+waren wertlos. Aufgefallen ist es nur, weil das Ergebnis *technisch
+unmöglich* war: Einen Wert, den `!important` nicht ändert, gibt es im Browser
+nicht. Der Screenshot zeigte dann eindeutig, dass die Regel greift.
+*Merksatz: Wenn eine Messung etwas Unmögliches behauptet, ist zuerst die
+Messung verdächtig, nicht der Code.* Größenangaben aus derselben Quelle haben
+sich mit den Screenshots gedeckt und sind belastbar; die Farbwerte wurden
+verworfen und über die Tokens nachgerechnet.
+
+**Ungetestet bleibt** die neue Sortierlogik in `suche()` — sie ist im Browser
+verifiziert, aber es gibt weiterhin keine Frontend-Testumgebung (siehe AP19).
 
 ## Nächster Schritt
 

@@ -93,7 +93,14 @@ const ohneRahmen = computed(() => route.meta.ohneRahmen === true);
   gap: 3px;
   font-size: var(--fs-11);
   font-weight: var(--fw-medium);
-  color: var(--fg-subtle);
+  /*
+   * --fg-muted (#52525b) statt --fg-subtle (#a1a1aa): Letzteres ergibt auf
+   * hellem Grund 2,6:1 und ist bei Sonnenlicht auf der Baustelle kaum zu
+   * lesen — ausgerechnet an der Hauptnavigation. Mit --fg-muted sind es
+   * 7,5:1, und der aktive Reiter hebt sich weiterhin klar ab, weil er
+   * volles Ink trägt.
+   */
+  color: var(--fg-muted);
   transition: color var(--t-fast) var(--ease);
 }
 

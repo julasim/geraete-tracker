@@ -148,6 +148,22 @@ onMounted(() => void bestand.laden());
 }
 
 .filter__knopf {
+  /*
+   * min-height 48px: Die Projektvorgabe für Tippziele (Daumen statt Maus,
+   * teils mit Handschuhen). Die Leiste kam mit der reinen Innenabstands-
+   * Angabe auf 37px und war damit das kleinste Ziel der ganzen Anwendung —
+   * ausgerechnet der Filter, den man auf der Baustelle im Vorbeigehen tippt.
+   */
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  /*
+   * Seitlicher Abstand bleibt bei space-3: Mit space-4 wurden die vier
+   * Filter zusammen breiter als ein 375px-Bildschirm, und "Defekt" rutschte
+   * aus dem Bild. Die Leiste scrollt zwar, aber ein Filter, den man erst
+   * heranziehen muss, wird nicht benutzt. Korrigiert werden sollte die
+   * Höhe, nicht die Breite.
+   */
   padding: var(--space-2) var(--space-3);
   font-size: var(--fs-13);
   font-weight: var(--fw-medium);
@@ -166,7 +182,8 @@ onMounted(() => void bestand.laden());
 }
 
 .neu {
-  min-height: 40px;
+  /* 48px wie alle Tippziele — siehe .filter__knopf. */
+  min-height: 48px;
   padding: 0 var(--space-3);
   font-size: var(--fs-13);
 }

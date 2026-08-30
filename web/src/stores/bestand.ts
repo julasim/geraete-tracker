@@ -107,12 +107,20 @@ export const useBestand = defineStore("bestand", () => {
   /**
    * Suche über alles, was auf einem Etikett oder Typenschild steht.
    * Mehrere Wörter müssen alle vorkommen, Reihenfolge egal.
+   *
+   * **Reine Ziffern werden als Etikettennummer verstanden** und die Treffer
+   * danach sortiert, nicht alphabetisch nach Bezeichnung. Wer `1001` eintippt
+   * — der Normalfall, wenn die Kamera streikt oder das Etikett verschmutzt
+   * ist —, sucht die Nummer und bekam vorher 10011, 10010, 10015, 10016 in
+   * der Reihenfolge der Gerätenamen. Nummern, die mit der Eingabe beginnen,
+   * stehen jetzt vorn und aufsteigend; alles andere folgt.
    */
   function suche(text: string): Geraet[] {
-    const woerter = text.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const eingabe = text.trim();
+    const woerter = eingabe.toLowerCase().split(/\s+/).filter(Boolean);
     if (!woerter.length) return geraete.value;
 
-    return geraete.value.filter((g) => {
+    const treffer = geraete.value.filter((g) => {
       const heuhaufen = [
         g.bezeichnung,
         g.inventarnummer,
@@ -127,6 +135,16 @@ export const useBestand = defineStore("bestand", () => {
         .join(" ")
         .toLowerCase();
       return woerter.every((w) => heuhaufen.includes(w));
+    });
+
+    if (!/^\d+$/.test(eingabe)) return treffer;
+
+    return [...treffer].sort((a, b) => {
+      const beginntA = a.inventarnummer?.startsWith(eingabe) ? 0 : 1;
+      const beginntB = b.inventarnummer?.startsWith(eingabe) ? 0 : 1;
+      if (beginntA !== beginntB) return beginntA - beginntB;
+      // Als Zahl vergleichen, nicht als Text: sonst käme 10100 vor 10011.
+      return Number(a.inventarnummer ?? 0) - Number(b.inventarnummer ?? 0);
     });
   }
 

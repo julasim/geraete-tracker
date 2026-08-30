@@ -8,7 +8,7 @@
  * verschmutztes Etikett auf einer gewölbten Fläche im Gegenlicht liest
  * keine Kamera zuverlässig.
  */
-import { onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { api, ApiError } from "@/api";
 import { useBestand } from "@/stores/bestand";
@@ -91,6 +91,21 @@ function oeffneGeraet(g: Geraet | { id: string }): void {
   void router.push(`/geraete/${g.id}`);
 }
 
+/**
+ * Ist die Kamera dauerhaft nicht zu haben?
+ *
+ * Dann schrumpft der schwarze Sucher auf die Meldung zusammen und gibt den
+ * Platz an die Handeingabe ab. Ausdrücklich NICHT bei "startet" oder "aus":
+ * Dort kommt die Kamera gleich, und ein springendes Layout unter dem Daumen
+ * ist schlimmer als ein Moment ungenutzter Fläche.
+ *
+ * Vorher belegte der leere Sucher auch ohne Kamera die halbe Höhe — gerade
+ * im Handeingabe-Fall, wo die Trefferliste den Platz braucht.
+ */
+const ohneKamera = computed(() =>
+  ["kein_zugriff", "kein_geraet", "nicht_unterstuetzt"].includes(scanner.zustand.value),
+);
+
 /** Vorschläge aus dem bereits geladenen Bestand — ohne Serveraufruf. */
 const vorschlaege = ref<Geraet[]>([]);
 watch(eingabe, (wert) => {
@@ -101,7 +116,7 @@ watch(eingabe, (wert) => {
 <template>
   <div class="scan">
     <!-- ── Sucher ─────────────────────────────────────────── -->
-    <div class="sucher">
+    <div class="sucher" :class="{ 'sucher--ohne-kamera': ohneKamera }">
       <video ref="videoEl" class="sucher__bild" playsinline muted autoplay></video>
 
       <!-- Der Rahmen liegt quer wie ein Strichcode: das führt von selbst
@@ -116,7 +131,12 @@ watch(eingabe, (wert) => {
         <template v-else>Kamera aus</template>
       </div>
 
-      <div class="sucher__knoepfe">
+      <!--
+        Ohne Kamera sind beide Knöpfe gegenstandslos: Licht schaltet nichts,
+        und die Handeingabe steht bereits offen. Sie blieben sonst über der
+        Meldung liegen, seit der Sucher auf sie zusammenschrumpft.
+      -->
+      <div v-if="!ohneKamera" class="sucher__knoepfe">
         <button
           v-if="scanner.lichtMoeglich.value"
           class="rundknopf"
@@ -333,6 +353,24 @@ watch(eingabe, (wert) => {
     border-radius: var(--radius-xl);
     margin: var(--space-4) var(--space-4) 0;
   }
+}
+
+/*
+ * Ohne Kamera bleibt nur die Meldung stehen. Das Seitenverhältnis muss dafür
+ * weichen — sonst hielte der leere schwarze Block seine 46dvh, egal was
+ * darin steht.
+ */
+.sucher--ohne-kamera {
+  aspect-ratio: auto;
+  max-height: none;
+}
+.sucher--ohne-kamera .sucher__bild,
+.sucher--ohne-kamera .sucher__rahmen {
+  display: none;
+}
+.sucher--ohne-kamera .sucher__meldung {
+  position: static;
+  background: transparent;
 }
 
 .sucher__bild {
