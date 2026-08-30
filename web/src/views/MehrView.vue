@@ -12,6 +12,17 @@ const anmeldung = useAnmeldung();
 const bestand = useBestand();
 const router = useRouter();
 
+/**
+ * Wie viele Geräte die Übersicht zeigt.
+ *
+ * Die Liste war auf zwölf gedeckelt, ohne das zu sagen — bei vierzig
+ * ausgegebenen Geräten sah man zwölf und hielt das für alles. Jetzt steht
+ * die Zahl in der Überschrift, und der letzte Eintrag führt zur
+ * vollständigen Liste (dieselbe Geräteansicht, auf "ausgegeben" gefiltert —
+ * eine zweite Liste zu bauen, die dasselbe zeigt, wäre doppelte Pflege).
+ */
+const SICHTBAR = 12;
+
 const offene = ref<OffeneAusgabe[]>([]);
 const pruefungen = ref<FaelligePruefung[]>([]);
 const sicherung = ref<SicherungsStand | null>(null);
@@ -144,9 +155,13 @@ async function abmelden(): Promise<void> {
       </section>
 
       <section v-if="offene.length">
-        <h2 class="pt-mikro abschnitt">Derzeit draußen</h2>
+        <h2 class="pt-mikro abschnitt">
+          Derzeit draußen<template v-if="offene.length > SICHTBAR">
+            — {{ SICHTBAR }} von {{ offene.length }}</template
+          >
+        </h2>
         <ul class="pt-karte pt-liste">
-          <li v-for="o in offene.slice(0, 12)" :key="o.geraet_id">
+          <li v-for="o in offene.slice(0, SICHTBAR)" :key="o.geraet_id">
             <RouterLink :to="`/geraete/${o.geraet_id}`" class="pt-zeile">
               <div class="pt-zeile__haupt">
                 <div class="pt-zeile__titel">{{ o.bezeichnung }}</div>
@@ -158,6 +173,15 @@ async function abmelden(): Promise<void> {
                 {{ o.tage }} T
               </span>
             </RouterLink>
+          </li>
+          <li v-if="offene.length > SICHTBAR">
+            <button class="pt-zeile" @click="router.push('/geraete?status=ausgegeben')">
+              <div class="pt-zeile__haupt">
+                <div class="pt-zeile__titel">
+                  Alle {{ offene.length }} ausgegebenen Geräte zeigen
+                </div>
+              </div>
+            </button>
           </li>
         </ul>
       </section>

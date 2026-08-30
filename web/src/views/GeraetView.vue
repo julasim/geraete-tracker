@@ -40,6 +40,18 @@ const id = route.params.id as string;
 const geraet = ref<Geraet | null>(null);
 const dateien = ref<Datei[]>([]);
 const historie = ref<Buchung[]>([]);
+
+/**
+ * Die Bilder, die zu einer bestimmten Buchung gehören.
+ *
+ * Sie stecken in derselben Liste wie die Gerätefotos — unterschieden werden
+ * sie über `buchung_id`. Die Spalte gab es seit AP8, nur hing nie etwas
+ * daran: Fotos ließen sich bis dahin nur am Gerät aufnehmen, nicht bei der
+ * Übergabe.
+ */
+function fotosZurBuchung(buchungId: string): Datei[] {
+  return dateien.value.filter((d) => d.buchung_id === buchungId);
+}
 const pruefungen = ref<Pruefung[]>([]);
 const schaeden = ref<Schaden[]>([]);
 const aktionen = ref<Aktion[]>([]);
@@ -396,6 +408,29 @@ onMounted(laden);
                   </div>
                   <div class="pt-gedaempft verlauf__zeile">erfasst von {{ b.erfasser }}</div>
                   <p v-if="b.notiz" class="verlauf__notiz">{{ b.notiz }}</p>
+
+                  <!--
+                    Fotos, die bei DIESER Buchung entstanden sind. Sie
+                    belegen den Zustand bei der Übergabe — genau der Punkt,
+                    an dem sich später streiten lässt, wie ein Gerät
+                    hinausging.
+                  -->
+                  <div v-if="fotosZurBuchung(b.id).length" class="verlauf__fotos">
+                    <a
+                      v-for="d in fotosZurBuchung(b.id)"
+                      :key="d.id"
+                      :href="`/api/dateien/${d.id}`"
+                      target="_blank"
+                      rel="noopener"
+                    >
+                      <img
+                        :src="`/api/dateien/${d.id}`"
+                        :alt="`Zustand bei der Buchung vom ${zeit(b.zeitpunkt)}`"
+                        class="verlauf__foto"
+                        loading="lazy"
+                      />
+                    </a>
+                  </div>
                 </div>
               </li>
             </ol>
@@ -583,5 +618,18 @@ onMounted(laden);
   font-size: var(--fs-13);
   background: var(--surface-muted);
   border-radius: var(--radius-md);
+}
+.verlauf__fotos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.verlauf__foto {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
 }
 </style>

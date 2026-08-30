@@ -257,6 +257,34 @@ wird als Etikett aufs Regal geklebt und ist beim Scannen die Antwort auf „was
 steht in diesem Regal?". Umbenennen geht jederzeit; die Kennung bleibt dabei
 unangetastet, weil das Etikett ja klebt.
 
+## Ein Foto bei der Übergabe
+
+Beim Ausgeben, Zurücknehmen und Umbuchen gibt es unter **Zustand festhalten**
+die Möglichkeit, ein Bild aufzunehmen. Es ist **freiwillig** — wer im Regen
+am Hänger steht, soll nicht fotografieren müssen.
+
+Sinnvoll ist es vor allem, wenn ein Gerät an eine **Fremdfirma** geht: Kommt
+es beschädigt zurück, lässt sich sonst nicht belegen, wie es hinausging.
+
+Das Bild hängt an der **Buchung**, nicht am Gerät — es zeigt einen Zeitpunkt,
+keinen Dauerzustand. Sie finden es später in der Geräteakte im Verlauf, bei
+genau dieser Buchung. Aus demselben Grund wird ein Übergabefoto **nie** zum
+Titelbild des Geräts: Dort gehört ein Bild hin, das die Maschine zeigt.
+
+*Scheitert die Übertragung — etwa im Funkloch —, ist die Buchung trotzdem
+gespeichert. Sie bekommen dann einen Hinweis, dass nur das Foto fehlt.*
+
+## Was ist gerade draußen?
+
+Unter **Mehr** zeigt der Abschnitt *Derzeit draußen* die zwölf zuletzt
+ausgegebenen Geräte mit Ort, Empfänger und der Zahl der Tage. Steht die
+Überschrift auf „12 von 40", gibt es mehr: Der letzte Eintrag der Liste führt
+zur vollständigen Aufstellung.
+
+**Wer hat ein bestimmtes Gerät?** Auch die Suche in der Geräteliste hilft —
+sie durchsucht neben Bezeichnung und Nummer auch **Standort und Nutzer**. Ein
+Name im Suchfeld zeigt also, was diese Person derzeit hat.
+
 ## Schlagworte und Prüfarten
 
 Unter **Mehr → Schlagworte und Prüfarten**.

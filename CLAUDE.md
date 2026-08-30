@@ -4,7 +4,7 @@ Web-Anwendung für Handy und iPad: Baumaschinen mit vorhandenen 1D-Strichcode-Et
 scannen, ausgeben, zurücknehmen — mit lückenloser Historie, wer ein Gerät wann auf
 welche Baustelle gebracht hat.
 
-**Stand: 2026-08-30 — AP1 bis AP21 fertig, als Docker-Paket abgenommen.** Anmelden, scannen, ausgeben,
+**Stand: 2026-08-30 — AP1 bis AP22 fertig, als Docker-Paket abgenommen.** Anmelden, scannen, ausgeben,
 zurücknehmen, umbuchen; Fotos und Dokumente; Prüfungen; Schäden; Zubehör;
 Geräte anlegen und bearbeiten, Import/Export als Tabelle, Etikettendruck;
 **Benutzerverwaltung in der Oberfläche mit frei zusammenstellbaren Rollen.**
@@ -980,6 +980,70 @@ Projekt-Vite kollidieren — ein Konflikt zweier Fremdpakete, den das Projekt
 nicht zu lösen hat.
 
 **Stand: 377 Tests** (357 Server, 20 Oberfläche), 23 Schutzregeln, ESLint,
+beide Typprüfungen und die Oberflächenprüfung grün.
+
+## AP22 — Zustandsfotos und die vollständige Liste (2026-08-30)
+
+Zwei von drei Vorschlägen aus der Durchsicht umgesetzt. **Der dritte wurde
+zurückgezogen**, siehe unten.
+
+**Zustandsfoto bei der Übergabe.** Der Fall: Ein Gerät kommt beschädigt
+zurück, und niemand kann belegen, wie es hinausging — bei Fremdfirmen der
+klassische Streitpunkt. In `BuchenView` gibt es jetzt ein freiwilliges Foto,
+in der Historie erscheint es bei der zugehörigen Buchung.
+
+*Der Unterbau stand schon vollständig:* `dateien.buchung_id` gibt es samt
+Fremdschlüssel seit AP8, die Upload-Route nimmt das Feld entgegen, die
+Datenschicht speichert es. Es fehlte allein die Bedienung — dieselbe Sorte
+Lücke wie bei den Standorten. **Die Oberflächenprüfung fand sie nicht**, weil
+sie Routen prüft, keine Parameter: `POST /dateien` wird ja aufgerufen, nur
+ohne `buchung_id`. Eine Grenze des Werkzeugs, die man kennen muss.
+
+**Reihenfolge und Fehlerfall sind Absicht:** Das Bild geht **nach** der
+Buchung hinaus (es hängt an ihr, also muss sie zuerst existieren), und ein
+gescheiterter Upload wirft die Buchung **nicht** um — der Bestand ist die
+Hauptsache, das Bild eine Beigabe.
+
+**Drei Fehler, die erst die Abnahme zutage förderte:**
+
+1. **Die Warnung war unsichtbar.** Scheitert der Upload, erschien die Meldung
+   nur im Formular — das nach dem Buchen sofort dem Fertig-Bildschirm weicht.
+   Der Benutzer hätte das Foto für gespeichert gehalten. *Ein Test hat das
+   gefunden, bevor es jemand im Betrieb tat.*
+2. **Das Zustandsfoto wurde zum Titelbild des Geräts.** Das erste Foto eines
+   Geräts wird von selbst zum Titelbild (damit die Liste nicht grau bleibt) —
+   mit Übergabefotos hieße das: Ein Gerät trägt fortan den Schnappschuss vom
+   Hänger im Regen als Aushängeschild. Im Browser gesehen, sonst nirgends.
+   Jetzt ausgenommen, **und ebenso Schadensfotos** — auch ein Riss im Gehäuse
+   ist kein Portrait des Geräts.
+3. **Der erste Fix war halb.** Die Zählung „gibt es schon ein Foto?" rechnete
+   das Zustandsfoto weiter mit — ein Gerät, bei dem zuerst ein Übergabefoto
+   entstand, hätte **nie mehr** ein Titelbild bekommen. Der Test, den ich für
+   Fehler 2 geschrieben hatte, deckte es sofort auf.
+
+**Das Formular wurde dabei zu lang.** Mit dem Foto-Feld als eigener Zeile
+rutschte der „Ausgeben"-Knopf auf gängigen Handys **unter die
+Navigationsleiste** (34 px Überlappung bei 375×812, 2 px bei 390×844) — der
+Hauptweg brauchte plötzlich einen Scrollvorgang. Beschriftung und Knopf
+stehen jetzt in einer Zeile; nachgemessen: 25 px Luft.
+
+**„Derzeit draußen" sagt jetzt, dass es mehr gibt.** Die Übersicht schnitt
+nach zwölf Einträgen ab, ohne Hinweis — bei vierzig ausgegebenen Geräten sah
+man zwölf und hielt das für alles. Jetzt steht die Zahl in der Überschrift
+(„12 von 40"), und der letzte Eintrag führt zur vollständigen Liste. Dafür
+nimmt die Geräteansicht den Filter aus der Adresse entgegen
+(`/geraete?status=ausgegeben`) — eine zweite Liste zu bauen, die dasselbe
+zeigt, wäre doppelte Pflege.
+
+**Zurückgezogen: der Index auf den Prüfungen.** Der Vorschlag beruhte auf
+einem **falschen Tabellennamen** — gemessen wurde `pruefungen`, die es nicht
+gibt; die Tabelle heißt `geraet_pruefungen` und hat drei Indizes, darunter
+einen passenden. Für die Fristenliste bleibt ein Sortierschritt, der bei
+realistischen Datenmengen nicht ins Gewicht fällt (alle Abfragen unter 13 ms).
+Ein weiterer Index brächte nichts und verteuerte jedes Schreiben.
+*Ein Befund ist nur so gut wie der Name, den man abgefragt hat.*
+
+**Stand: 385 Tests** (361 Server, 24 Oberfläche), 23 Schutzregeln, ESLint,
 beide Typprüfungen und die Oberflächenprüfung grün.
 
 ## Nächster Schritt

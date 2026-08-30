@@ -58,10 +58,26 @@ export async function speichereDatei(eintrag: {
 }): Promise<Datei> {
   // Das erste Bild eines Geräts wird von selbst zum Titelbild — sonst
   // bliebe die Liste grau, bis jemand daran denkt, eines auszuwählen.
+  //
+  // NICHT aber ein Bild, das einen Vorgang zeigt statt des Geräts: das
+  // Zustandsfoto einer Übergabe (`buchung_id`) und das Schadensfoto
+  // (`schaden_id`). Beide halten einen Moment fest — ein Gerät am Hänger im
+  // Regen, einen Riss im Gehäuse. Als Aushängeschild in der Geräteliste
+  // wäre das falsch.
+  //
+  // Die Zählung muss dieselbe Ausnahme kennen: Sonst bekäme ein Gerät, bei
+  // dem zuerst ein Übergabefoto entstand, NIE mehr ein Titelbild — der
+  // Zähler stünde auf 1, obwohl es kein Gerätefoto gibt. Beim Einbau genau
+  // so gebaut; ein Test hat es aufgedeckt.
   const [vorhanden] = await db()<{ n: number }[]>`
     SELECT count(*)::int AS n FROM dateien
-     WHERE geraet_id = ${eintrag.geraet_id} AND art = 'foto'`;
-  const istErstes = eintrag.art === "foto" && (vorhanden?.n ?? 0) === 0;
+     WHERE geraet_id = ${eintrag.geraet_id} AND art = 'foto'
+       AND buchung_id IS NULL AND schaden_id IS NULL`;
+  const istErstes =
+    eintrag.art === "foto" &&
+    !eintrag.buchung_id &&
+    !eintrag.schaden_id &&
+    (vorhanden?.n ?? 0) === 0;
 
   const zeilen = await db()<{ id: string }[]>`
     INSERT INTO dateien (geraet_id, schaden_id, buchung_id, art, dateiname, pfad,

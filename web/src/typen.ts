@@ -116,6 +116,12 @@ export interface Geraet {
 export interface Datei {
   id: string;
   geraet_id: string;
+  /**
+   * Gesetzt, wenn das Bild bei einer Buchung entstanden ist — der Zustand
+   * bei der Übergabe. Der Server liefert das Feld seit AP8 mit; hier fehlte
+   * es, weil bis dahin nichts daran hing.
+   */
+  buchung_id: string | null;
   art: "foto" | "dokument";
   dateiname: string;
   mime: string;

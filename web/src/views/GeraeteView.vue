@@ -5,7 +5,7 @@
  * spürbar langsamer.
  */
 import { computed, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useBestand } from "@/stores/bestand";
 import type { GeraetStatus } from "@/typen";
 import { useAnmeldung } from "@/stores/anmeldung";
@@ -18,14 +18,25 @@ const router = useRouter();
 const anmeldung = useAnmeldung();
 
 const suchtext = ref("");
-const filter = ref<GeraetStatus | "alle">("alle");
-
 const FILTER: { wert: GeraetStatus | "alle"; text: string }[] = [
   { wert: "alle", text: "Alle" },
   { wert: "verfuegbar", text: "Verfügbar" },
   { wert: "ausgegeben", text: "Ausgegeben" },
   { wert: "defekt", text: "Defekt" },
 ];
+
+/**
+ * Der Filter lässt sich über die Adresse vorbelegen (`/geraete?status=ausgegeben`).
+ * So kann die Übersicht auf die vollständige Liste der ausgegebenen Geräte
+ * verweisen, statt eine zweite Liste zu führen, die dasselbe zeigt.
+ */
+const route = useRoute();
+const ausAdresse = route.query.status;
+const filter = ref<GeraetStatus | "alle">(
+  typeof ausAdresse === "string" && FILTER.some((f) => f.wert === ausAdresse)
+    ? (ausAdresse as GeraetStatus)
+    : "alle",
+);
 
 const gefiltert = computed(() => {
   const treffer = bestand.suche(suchtext.value);
