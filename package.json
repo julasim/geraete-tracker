@@ -21,9 +21,10 @@
     "build:server": "tsc && node scripts/kopiere-migrationen.mjs",
     "dev:web": "npm --prefix web run dev",
     "postinstall": "npm --prefix web install",
-    "lint": "eslint src/ tests/ scripts/ web/src/",
-    "lint:fix": "eslint src/ tests/ scripts/ web/src/ --fix",
-    "pruefe:oberflaeche": "node scripts/pruefe-oberflaeche.mjs"
+    "lint": "eslint src/ tests/ scripts/ web/src/ web/tests/",
+    "lint:fix": "eslint src/ tests/ scripts/ web/src/ web/tests/ --fix",
+    "pruefe:oberflaeche": "node scripts/pruefe-oberflaeche.mjs",
+    "test:web": "npm --prefix web run test"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.9",

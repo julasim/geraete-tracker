@@ -4,7 +4,7 @@ Web-Anwendung für Handy und iPad: Baumaschinen mit vorhandenen 1D-Strichcode-Et
 scannen, ausgeben, zurücknehmen — mit lückenloser Historie, wer ein Gerät wann auf
 welche Baustelle gebracht hat.
 
-**Stand: 2026-08-30 — AP1 bis AP20 fertig, als Docker-Paket abgenommen.** Anmelden, scannen, ausgeben,
+**Stand: 2026-08-30 — AP1 bis AP21 fertig, als Docker-Paket abgenommen.** Anmelden, scannen, ausgeben,
 zurücknehmen, umbuchen; Fotos und Dokumente; Prüfungen; Schäden; Zubehör;
 Geräte anlegen und bearbeiten, Import/Export als Tabelle, Etikettendruck;
 **Benutzerverwaltung in der Oberfläche mit frei zusammenstellbaren Rollen.**
@@ -932,6 +932,55 @@ verworfen und über die Tokens nachgerechnet.
 
 **Ungetestet bleibt** die neue Sortierlogik in `suche()` — sie ist im Browser
 verifiziert, aber es gibt weiterhin keine Frontend-Testumgebung (siehe AP19).
+
+## AP21 — Testumgebung für die Oberfläche (2026-08-30)
+
+Die letzte offene Lücke: Das Frontend hatte **keine Tests**. Bei jeder Runde
+stand am Ende „im Browser verifiziert" — was für einen Durchgang reicht, aber
+nichts festhält. Die Sortierlogik aus AP20 war das jüngste Beispiel.
+
+**Eingerichtet:** eigene Vitest-Umgebung unter `web/` (jsdom,
+`@vue/test-utils`), `npm run test:web`, ein Schritt in der Werkbank. **Bewusst
+getrennt** von der Server-Suite: Die läuft gegen eine echte Datenbank, diese
+gegen gar nichts. Müsste jeder Frontend-Test erst Postgres hochfahren, führte
+sie niemand mehr aus.
+
+**20 Tests in drei Dateien:**
+- `bestand-suche.test.ts` — die Reihenfolge der Treffer. Reine Ziffern werden
+  numerisch sortiert, Präfix-Treffer zuerst, und die Zahl als **Zahl**
+  verglichen (sonst käme 10100 vor 10011). Textsuche bleibt unangetastet.
+- `bestand-pflege.test.ts` — dass ein neu angelegter Ort, Regalplatz oder
+  ein Schlagwort sofort im geladenen Bestand steht („automatisch hinterlegt",
+  Julius' Vorgabe) und beim Ändern **ersetzt** statt verdoppelt wird. Dazu
+  der Fall, der sonst still schiefgeht: Ein gelöschtes Schlagwort muss auch
+  **an den Geräten** verschwinden.
+- `orte-anlegen.test.ts` — die Ansicht selbst: kein Formular ohne
+  `stammdaten.pflegen`, kein Absenden bei leerem Namen, die Dublettenwarnung
+  erscheint und **blockiert nicht**, und eine leere Adresse geht als `null`
+  hinaus statt als leerer Text.
+
+**Alle drei gegengeprüft:** Sortierung ausgebaut → 3 Tests rot.
+Rechteprüfung und Dublettenwarnung ausgebaut → 2 Tests rot. Danach
+zurückgenommen: grün.
+
+**Zwei Fallen beim Aufsetzen:**
+1. **Der erste Testlauf war rot — und der Fehler lag im Test.** `10015`
+   enthält „1001" ebenfalls als Präfix und gehört in die Erwartung. Die Suite
+   hat ihren ersten eigenen Fehler sofort gemeldet.
+2. **jsdom löst bei einem Klick auf `type="submit"` kein `submit` aus**,
+   anders als jeder echte Browser. Zwei Tests schlugen deshalb fehl, obwohl
+   der Code stimmte; sie senden das Formular jetzt direkt ab.
+
+**Nachgezogen:** ESLint prüft `web/tests/` mit, und die Typprüfung erfasst
+die Testdateien — vorher deckte `include` nur `src/` ab, ein Typfehler im Test
+wäre also niemandem aufgefallen. *Gegengeprüft mit einem eingeschmuggelten
+Typfehler.* `vitest.config.ts` bleibt bewusst außen vor: vitest bringt eine
+eigene Vite-Fassung mit, deren Plugin-Typen mit der rolldown-basierten
+Projekt-Vite kollidieren — ein Konflikt zweier Fremdpakete, den das Projekt
+nicht zu lösen hat.
+
+**Stand: 377 Tests** (357 Server, 20 Oberfläche), 23 Schutzregeln, ESLint,
+beide Typprüfungen und die Oberflächenprüfung grün.
 
 ## Nächster Schritt
 

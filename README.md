@@ -89,10 +89,13 @@ API und Web-Anwendung aus.
 ## Prüfen, dass alles läuft
 
 ```bash
-npm test
+npm test          # 357 Tests gegen die Datenbank (Server)
+npm run test:web  # 20 Tests der Oberfläche, ohne Datenbank
 ```
 
-357 Tests. Zusätzlich sechs Durchläufe **gegen die laufende Anwendung** — die
+**377 Tests.** Zwei getrennte Suiten mit Absicht: Die Server-Tests brauchen
+eine laufende Datenbank, die der Oberfläche nicht. Müsste man für einen
+Store-Test erst Postgres hochfahren, führte sie niemand mehr aus. Zusätzlich sechs Durchläufe **gegen die laufende Anwendung** — die
 Testsuite läuft im selben Prozess und würde nicht merken, wenn der gebaute
 Server gar nicht startet:
 

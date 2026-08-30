@@ -79,6 +79,10 @@ jobs:
       - name: Oberfläche vollständig verdrahtet
         run: npm run pruefe:oberflaeche
 
+      # Eigene Suite ohne Datenbank: Store-Logik und Komponenten.
+      - name: Tests (Oberfläche)
+        run: npm run test:web
+
       - name: Tests
         run: npm test
 
