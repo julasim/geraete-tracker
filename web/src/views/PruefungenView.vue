@@ -15,6 +15,7 @@ import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { api, ApiError } from "@/api";
 import type { Ampel, FaelligePruefung } from "@/typen";
+import { ampelKlasse, frist } from "@/format";
 import Kopf from "@/components/Kopf.vue";
 
 const liste = ref<FaelligePruefung[]>([]);
@@ -54,26 +55,7 @@ function datum(iso: string): string {
   return new Date(iso).toLocaleDateString("de-AT");
 }
 
-/**
- * Die Restfrist in Worten.
- *
- * "in 3 Tagen" ist im Bauhof brauchbarer als ein Datum, das man erst gegen
- * den Kalender halten muss — beim Datum selbst bleibt es trotzdem, weil der
- * Prüftermin danach vereinbart wird.
- */
-function frist(tage: number): string {
-  if (tage < -1) return `seit ${Math.abs(tage)} Tagen`;
-  if (tage === -1) return "seit gestern";
-  if (tage === 0) return "heute";
-  if (tage === 1) return "morgen";
-  return `in ${tage} Tagen`;
-}
 
-function chipKlasse(ampel: Ampel): string {
-  if (ampel === "ueberfaellig") return "pt-chip--defekt";
-  if (ampel === "faellig") return "pt-chip--warnung";
-  return "pt-chip--neutral";
-}
 
 async function laden(): Promise<void> {
   laedt.value = true;
@@ -130,7 +112,7 @@ onMounted(laden);
                     · {{ p.pruefart }} · {{ datum(p.naechste_faellig) }}
                   </div>
                 </div>
-                <span class="pt-chip" :class="chipKlasse(p.ampel)">
+                <span class="pt-chip" :class="ampelKlasse(p.ampel)">
                   {{ frist(p.tage_bis_faellig) }}
                 </span>
               </RouterLink>

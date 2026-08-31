@@ -66,6 +66,14 @@ export const router = createRouter({
       meta: { recht: "etiketten.drucken" },
     },
     {
+      // Die Startseite am Computer. Am Handy übernimmt "Mehr" dieselbe
+      // Aufgabe — eine fünfspaltige Kennzahlenreihe auf 390 px wären fünf
+      // unlesbare Spalten.
+      path: "/uebersicht",
+      name: "uebersicht",
+      component: () => import("@/views/UebersichtView.vue"),
+    },
+    {
       // Ohne meta.recht: Wer ein Paket ausgeben will, muss sehen, was drin
       // ist. Die Knöpfe zum Ändern erscheinen nur mit stammdaten.pflegen.
       path: "/pakete",

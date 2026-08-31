@@ -98,6 +98,11 @@ export default tseslint.config(
         requestAnimationFrame: "readonly",
         cancelAnimationFrame: "readonly",
         MediaStream: "readonly",
+        // Für den Umbruchpunkt der Computer-Oberfläche (AppShell): Die
+        // Medienabfrage steht in CSS UND in JavaScript, damit die untere
+        // Leiste im breiten Modus gar nicht erst im DOM landet.
+        MediaQueryList: "readonly",
+        MediaQueryListEvent: "readonly",
         ImageData: "readonly",
         createImageBitmap: "readonly",
         OffscreenCanvas: "readonly",

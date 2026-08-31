@@ -1,16 +1,33 @@
 <script setup lang="ts">
 /**
- * Der Rahmen: Kopfzeile, Inhalt, untere Leiste.
+ * Der Rahmen — in zwei Haltungen.
  *
- * Anders als PATIO, das eine 3-Spalten-Bürooberfläche hat: Hier eine Spalte
- * und die Navigation UNTEN. Auf der Baustelle wird einhändig bedient, und
- * der Daumen erreicht den oberen Bildschirmrand nicht.
+ * **Unter 1024 px:** eine Spalte, Navigation UNTEN. Auf der Baustelle wird
+ * einhändig bedient, und der Daumen erreicht den oberen Bildschirmrand nicht.
+ *
+ * **Ab 1024 px:** Seitenleiste links, Inhalt rechts. Am Schreibtisch gibt es
+ * keinen Daumen, dafür Platz in der Breite und mehr Ziele, als vier Reiter
+ * fassen — Prüfungen, Pakete, Etiketten, Import, Stammdaten, Benutzer.
+ *
+ * **Nur ein Umbruchpunkt, keine Zwischenstufe.** Ein iPad quer bekommt die
+ * Seitenleiste, ein iPad hoch die untere Leiste. Zwei Haltungen sind
+ * begreifbar, drei nicht.
+ *
+ * Der Wechsel geschieht über eine Medienabfrage in CSS und dieselbe Abfrage
+ * in JavaScript: Die untere Leiste soll im DOM gar nicht erst auftauchen,
+ * wenn sie unsichtbar wäre — sonst führen Tastatur und Vorlesehilfe durch
+ * eine doppelte Navigation.
  */
-import { computed } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { RouterLink, useRoute } from "vue-router";
+import { api } from "@/api";
+import { useAnmeldung } from "@/stores/anmeldung";
+import type { FaelligePruefung } from "@/typen";
+import SeitenLeiste from "./SeitenLeiste.vue";
 import Symbol from "./Symbol.vue";
 
 const route = useRoute();
+const anmeldung = useAnmeldung();
 
 const reiter = [
   { pfad: "/scan", symbol: "scan" as const, text: "Scannen" },
@@ -22,17 +39,44 @@ const reiter = [
 const istAktiv = (pfad: string) => route.path === pfad || route.path.startsWith(pfad + "/");
 // Der Sucher soll den ganzen Schirm bekommen.
 const ohneRahmen = computed(() => route.meta.ohneRahmen === true);
+
+/** Die Grenze steht an EINER Stelle — CSS und JavaScript teilen sie sich. */
+const BREIT_AB = "(min-width: 1024px)";
+const breit = ref(false);
+let abfrage: MediaQueryList | null = null;
+const merken = (e: MediaQueryListEvent | MediaQueryList) => (breit.value = e.matches);
+
+/** Überfällige Prüfungen — der Zähler an der Seitenleiste. */
+const faellig = ref(0);
+
+onMounted(async () => {
+  abfrage = window.matchMedia(BREIT_AB);
+  merken(abfrage);
+  abfrage.addEventListener("change", merken);
+
+  try {
+    const liste = await api.get<FaelligePruefung[]>("/pruefungen/faellig");
+    faellig.value = liste.filter((p) => p.ampel === "ueberfaellig").length;
+  } catch {
+    // Ohne Zahl bleibt der Zähler aus. Ein fehlender Hinweis ist besser als
+    // eine erfundene Zahl.
+  }
+});
+
+onBeforeUnmount(() => abfrage?.removeEventListener("change", merken));
 </script>
 
 <template>
-  <div class="shell" :class="{ 'shell--blank': ohneRahmen }">
+  <div class="shell" :class="{ 'shell--blank': ohneRahmen, 'shell--breit': breit }">
+    <SeitenLeiste v-if="breit && !ohneRahmen && anmeldung.angemeldet" :faellig="faellig" />
+
     <main class="shell__inhalt">
       <div class="shell__breite">
         <slot />
       </div>
     </main>
 
-    <nav class="leiste" aria-label="Hauptnavigation">
+    <nav v-if="!breit" class="leiste" aria-label="Hauptnavigation">
       <RouterLink
         v-for="r in reiter"
         :key="r.pfad"
@@ -56,10 +100,27 @@ const ohneRahmen = computed(() => route.meta.ohneRahmen === true);
   background: var(--surface-subtle);
 }
 
+/* Ab 1024 px nebeneinander: Leiste links, Inhalt rechts. */
+.shell--breit {
+  flex-direction: row;
+  height: 100dvh;
+  overflow: hidden;
+}
+
 .shell__inhalt {
   flex: 1;
   /* Platz für die Leiste plus die Gestenzone am unteren Rand des iPhones. */
   padding-bottom: calc(var(--leiste-hoehe) + env(safe-area-inset-bottom) + var(--space-4));
+}
+
+/*
+ * Im breiten Modus scrollt der INHALT, nicht die Seite: Sonst wanderte die
+ * Seitenleiste beim Scrollen mit nach oben aus dem Bild.
+ */
+.shell--breit .shell__inhalt {
+  padding-bottom: 0;
+  overflow-y: auto;
+  min-width: 0;
 }
 
 .shell--blank .shell__inhalt {
@@ -69,6 +130,12 @@ const ohneRahmen = computed(() => route.meta.ohneRahmen === true);
 .shell__breite {
   max-width: var(--container);
   margin: 0 auto;
+}
+
+/* Am Schreibtisch keine Mittenbegrenzung — die Tabelle nutzt die Breite. */
+.shell--breit .shell__breite {
+  max-width: none;
+  margin: 0;
 }
 
 .leiste {
