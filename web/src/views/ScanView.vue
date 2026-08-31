@@ -61,6 +61,9 @@ async function nachschlagen(code: string): Promise<void> {
   fehler.value = null;
   try {
     ergebnis.value = await api.get<ScanErgebnis>(`/scan/${encodeURIComponent(code.trim())}`);
+    // Im Sammelmodus nur einsammeln — die Gerätekarte erscheint nicht.
+    // Ein Regalplatz-Treffer bleibt außen vor: Man sammelt Geräte, keine Orte.
+    if (ergebnis.value?.typ === "geraet") trefferAufnehmen(ergebnis.value.geraet);
   } catch (f) {
     if (f instanceof ApiError && (f.status === 404 || f.status === 409)) {
       // 404 und 409 sind hier keine Fehler, sondern Antworten: unbekannter
@@ -106,6 +109,33 @@ const ohneKamera = computed(() =>
   ["kein_zugriff", "kein_geraet", "nicht_unterstuetzt"].includes(scanner.zustand.value),
 );
 
+/**
+ * Sammelmodus — mehrere Geräte für EINE Buchung zusammentragen.
+ *
+ * Der Fall aus dem Bauhof: Zehn Geräte gehen auf dieselbe Baustelle. Einzeln
+ * gebucht sind das dreißig Handgriffe; gesammelt sind es zwölf.
+ *
+ * Bewusst ein **Schalter** und kein neuer Standard: Ein einzelnes Gerät zu
+ * buchen bleibt der häufigste Fall und darf dadurch nicht länger werden.
+ */
+const sammelmodus = ref(false);
+
+/** Im Sammelmodus wandert ein Treffer in die Liste, statt die Karte zu zeigen. */
+function trefferAufnehmen(g: { id: string }): boolean {
+  if (!sammelmodus.value) return false;
+  bestand.sammle(g.id);
+  // Sofort weiterscannen: Die Karte würde nur im Weg stehen.
+  ergebnis.value = null;
+  eingabe.value = "";
+  return true;
+}
+
+const gesammelt = computed(() => bestand.gesammelteGeraete);
+
+function sammelBuchen(art: "ausgabe" | "ruecknahme" | "umbuchung"): void {
+  void router.push(`/sammeln/${art}`);
+}
+
 /** Vorschläge aus dem bereits geladenen Bestand — ohne Serveraufruf. */
 const vorschlaege = ref<Geraet[]>([]);
 watch(eingabe, (wert) => {
@@ -115,6 +145,21 @@ watch(eingabe, (wert) => {
 
 <template>
   <div class="scan">
+    <!-- ── Sammelmodus ────────────────────────────────────── -->
+    <div class="sammelleiste">
+      <label class="sammelschalter">
+        <input v-model="sammelmodus" type="checkbox" class="sammelschalter__feld" />
+        <span class="sammelschalter__text">Mehrere sammeln</span>
+      </label>
+      <button
+        v-if="gesammelt.length"
+        class="pt-btn pt-btn--still kleinknopf"
+        @click="bestand.sammlungLeeren()"
+      >
+        Liste leeren
+      </button>
+    </div>
+
     <!-- ── Sucher ─────────────────────────────────────────── -->
     <div class="sucher" :class="{ 'sucher--ohne-kamera': ohneKamera }">
       <video ref="videoEl" class="sucher__bild" playsinline muted autoplay></video>
@@ -330,6 +375,40 @@ watch(eingabe, (wert) => {
         Nächstes Gerät scannen
       </button>
     </div>
+
+    <!-- ── Gesammelte Geräte ──────────────────────────────── -->
+    <section v-if="gesammelt.length" class="sammlung">
+      <h2 class="pt-mikro sammlung__titel">
+        {{ gesammelt.length }} Gerät{{ gesammelt.length === 1 ? "" : "e" }} gesammelt
+      </h2>
+
+      <ul class="pt-liste sammlung__liste">
+        <li v-for="g in gesammelt" :key="g!.id" class="sammlung__zeile">
+          <div class="pt-zeile__haupt">
+            <div class="pt-zeile__titel">{{ g!.bezeichnung }}</div>
+            <div class="pt-zeile__unter pt-mono">{{ g!.inventarnummer }}</div>
+          </div>
+          <StatusChip :status="g!.status" />
+          <button
+            class="pt-btn pt-btn--still kleinknopf"
+            :aria-label="`${g!.bezeichnung} aus der Liste nehmen`"
+            @click="bestand.entsammle(g!.id)"
+          >
+            Entfernen
+          </button>
+        </li>
+      </ul>
+
+      <div class="sammlung__knoepfe">
+        <button class="pt-btn pt-btn--primaer pt-btn--breit" @click="sammelBuchen('ausgabe')">
+          Ausgeben
+        </button>
+        <button class="pt-btn pt-btn--breit" @click="sammelBuchen('ruecknahme')">
+          Zurücknehmen
+        </button>
+        <button class="pt-btn pt-btn--breit" @click="sammelBuchen('umbuchung')">Umbuchen</button>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -512,5 +591,57 @@ watch(eingabe, (wert) => {
 }
 .scan__meldung {
   margin: var(--space-4);
+}
+.sammelleiste {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.sammelschalter {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  /* 48px Tippziel — wie überall (siehe AP20). */
+  min-height: 48px;
+  cursor: pointer;
+}
+.sammelschalter__feld {
+  width: 22px;
+  height: 22px;
+}
+.sammelschalter__text {
+  font-size: var(--fs-14);
+  font-weight: var(--fw-medium);
+}
+.sammlung {
+  padding: var(--space-3) var(--space-4) var(--space-5);
+}
+.sammlung__titel {
+  margin-bottom: var(--space-2);
+}
+.sammlung__liste {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-3);
+}
+.sammlung__zeile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+}
+.sammlung__knoepfe {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.kleinknopf {
+  font-size: var(--fs-12);
+  padding: var(--space-1) var(--space-2);
 }
 </style>

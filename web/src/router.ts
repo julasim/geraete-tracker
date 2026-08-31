@@ -37,6 +37,15 @@ export const router = createRouter({
       meta: { recht: "geraete.pflegen" },
     },
     {
+      // Sammelbuchung: Die Geräte stehen im Store, nicht im Pfad — eine
+      // Liste von zehn UUIDs in der Adresse wäre unlesbar und bei einem
+      // Neuladen ohnehin verloren.
+      path: "/sammeln/:art",
+      name: "sammeln",
+      component: () => import("@/views/SammelBuchenView.vue"),
+      meta: { recht: "buchungen.erfassen" },
+    },
+    {
       path: "/buchen/:id/:art",
       name: "buchen",
       component: () => import("@/views/BuchenView.vue"),
@@ -55,6 +64,13 @@ export const router = createRouter({
       name: "etiketten",
       component: () => import("@/views/EtikettenView.vue"),
       meta: { recht: "etiketten.drucken" },
+    },
+    {
+      // Ohne meta.recht: Wer ein Paket ausgeben will, muss sehen, was drin
+      // ist. Die Knöpfe zum Ändern erscheinen nur mit stammdaten.pflegen.
+      path: "/pakete",
+      name: "pakete",
+      component: () => import("@/views/PaketeView.vue"),
     },
     {
       // Ohne meta.recht: Die Ansicht zeigt Schlagworte und Prüfarten, und

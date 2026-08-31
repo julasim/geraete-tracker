@@ -22,6 +22,7 @@ import {
   mustereAus,
   sucheGeraete,
 } from "../../data/geraete.js";
+import { zubehoerVon } from "../../data/pakete.js";
 import { EingabeFehler } from "../fehler.js";
 import { pfadId, pfadText } from "../pfad.js";
 
@@ -56,6 +57,19 @@ geraeteRouten.get("/geraete", async (c) => {
 });
 
 geraeteRouten.get("/geraete/:id", async (c) => c.json(await findeGeraet(pfadId(c))));
+
+/**
+ * Das Zubehör eines Geräts — die Löffel zum Bagger.
+ *
+ * Beim Buchen wird es zum Mitnehmen vorgeschlagen: Wer den Bagger ausgibt,
+ * lädt die Löffel mit auf, und ohne diesen Vorschlag stünden sie im System
+ * weiter im Lager.
+ */
+geraeteRouten.get("/geraete/:id/zubehoer", async (c) => {
+  const id = pfadId(c);
+  await findeGeraet(id); // 404 statt leerer Liste, wenn es das Gerät nicht gibt
+  return c.json(await zubehoerVon(id));
+});
 
 geraeteRouten.get("/geraete/:id/barcodes", async (c) =>
   c.json(await listeBarcodes(pfadId(c))),

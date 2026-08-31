@@ -35,6 +35,7 @@ import { buchungsRouten } from "./routes/buchungen.js";
 import { dateiRouten } from "./routes/dateien.js";
 import { etikettenRouten } from "./routes/etiketten.js";
 import { geraeteRouten } from "./routes/geraete.js";
+import { paketRouten } from "./routes/pakete.js";
 import { pflegeRouten } from "./routes/pflege.js";
 import { scanRouten } from "./routes/scan.js";
 import { stammdatenRouten } from "./routes/stammdaten.js";
@@ -240,6 +241,7 @@ app.use("/api/*", async (c, next) => {
 // ── Routen ──────────────────────────────────────────────────────────────────
 app.route("/api", authRouten);
 app.route("/api", stammdatenRouten);
+app.route("/api", paketRouten);
 app.route("/api", geraeteRouten);
 app.route("/api", buchungsRouten);
 app.route("/api", scanRouten);

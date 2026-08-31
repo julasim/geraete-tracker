@@ -14,7 +14,7 @@ import { z } from "zod";
 import { angemeldet, darf, type AppEnv } from "../auth.js";
 import { pfadId } from "../pfad.js";
 import { EingabeFehler } from "../fehler.js";
-import { buche, historie, korrigiere, offeneAusgaben } from "../../data/buchungen.js";
+import { buche, bucheMehrere, historie, korrigiere, offeneAusgaben } from "../../data/buchungen.js";
 import { findeGeraet } from "../../data/geraete.js";
 
 export const buchungsRouten = new Hono<AppEnv>();
@@ -46,6 +46,29 @@ const buchungsSchema = z.object({
   geplante_rueckgabe: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
   notiz: z.string().max(2000).nullish(),
   ausfall: z.boolean().optional(),
+});
+
+/**
+ * Sammelbuchung: dieselben Angaben, nur für mehrere Geräte.
+ *
+ * Die Obergrenze von 100 ist keine fachliche, sondern eine Notbremse: Ein
+ * Transporter fasst keine hundert Maschinen, und eine versehentlich
+ * abgeschickte Riesenliste soll nicht minutenlang eine Transaktion halten,
+ * die alle anderen Buchungen blockiert.
+ */
+const sammelSchema = buchungsSchema
+  .omit({ geraet_id: true })
+  .extend({ geraet_ids: z.array(z.string().uuid()).min(1).max(100) });
+
+buchungsRouten.post("/buchungen/sammel", darf("buchungen.erfassen"), async (c) => {
+  const { geraet_ids, ...daten } = await gelesen(c, sammelSchema);
+  const benutzer = angemeldet(c);
+
+  const buchungen = await bucheMehrere(geraet_ids, daten, benutzer.id);
+  // Die Geräte kommen mit zurück — wie bei der Einzelbuchung zeigt die
+  // Oberfläche danach den neuen Zustand ohne zweiten Aufruf.
+  const geraete = await Promise.all(buchungen.map((b) => findeGeraet(b.geraet_id)));
+  return c.json({ buchungen, geraete }, 201);
 });
 
 buchungsRouten.post("/buchungen", darf("buchungen.erfassen"), async (c) => {

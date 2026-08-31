@@ -4,7 +4,7 @@ Web-Anwendung für Handy und iPad: Baumaschinen mit vorhandenen 1D-Strichcode-Et
 scannen, ausgeben, zurücknehmen — mit lückenloser Historie, wer ein Gerät wann auf
 welche Baustelle gebracht hat.
 
-**Stand: 2026-08-30 — AP1 bis AP22 fertig, als Docker-Paket abgenommen.** Anmelden, scannen, ausgeben,
+**Stand: 2026-08-31 — AP1 bis AP23 fertig, als Docker-Paket abgenommen.** Anmelden, scannen, ausgeben,
 zurücknehmen, umbuchen; Fotos und Dokumente; Prüfungen; Schäden; Zubehör;
 Geräte anlegen und bearbeiten, Import/Export als Tabelle, Etikettendruck;
 **Benutzerverwaltung in der Oberfläche mit frei zusammenstellbaren Rollen.**
@@ -1045,6 +1045,75 @@ Ein weiterer Index brächte nichts und verteuerte jedes Schreiben.
 
 **Stand: 385 Tests** (361 Server, 24 Oberfläche), 23 Schutzregeln, ESLint,
 beide Typprüfungen und die Oberflächenprüfung grün.
+
+## AP23 — Sammelbuchung, Pakete, Zubehör (2026-08-31)
+
+Drei Dinge, die denselben Alltag betreffen: das Bestücken eines Transporters.
+
+**Sammelbuchung.** Zehn Geräte auf dieselbe Baustelle waren zehnmal derselbe
+Durchlauf — **dreißig Handgriffe**. Jetzt: Schalter „Mehrere sammeln" im
+Scanner, alles einlesen, einmal Ziel und Person wählen, einmal bestätigen.
+
+**`POST /buchungen/sammel` bucht alles oder nichts** in einer Transaktion.
+Eine halb ausgeführte Sammelbuchung hinterließe einen Bestand, den niemand
+mehr erklären kann — welche fünf der zehn sind jetzt draußen? Die Meldung
+nennt das Gerät beim Namen („ZUB-Minibagger 1,8 t (97254): Dieses Gerät ist
+bereits ausgegeben."), es wird aus der Liste genommen, der Rest geht durch.
+Die Sperren werden **nach Id sortiert** geholt, sonst blockieren sich zwei
+gleichzeitige Sammelbuchungen mit überlappenden Geräten gegenseitig.
+
+**Zubehör fährt mit.** Das Datenmodell kennt es seit AP8
+(`geraete.gehoert_zu_id`), **beim Buchen wurde es nie berücksichtigt** — wer
+den Bagger ausgab, ließ die Löffel im Bestand stehen, obwohl sie auf dem
+Hänger lagen. Jetzt wird es vorgeschlagen: **vorangehakt** (der Regelfall)
+und **abwählbar** (manchmal bleibt der Löffel da). Auch bei der
+Einzelbuchung; geht Zubehör mit, wird daraus intern eine Sammelbuchung —
+sonst könnte der Bagger draußen stehen und der Löffel laut System im Lager.
+
+**Pakete** (Migration 011, `pakete` + `paket_geraete`): benannte
+Zusammenstellungen für den wiederkehrenden Fall — zur Estrich-Baustelle
+fahren immer dieselben acht Geräte. **Ein Paket hält keinen eigenen
+Bestand**, es zeigt nur auf Geräte; wo etwas steht, sagt allein das Gerät.
+Zwei Wahrheiten darüber liefen unweigerlich auseinander. Ein Gerät darf in
+mehreren Paketen stecken, und „Paket ausgeben" ist ein **Vorschlag**: Es
+füllt die Sammelliste, gebucht wird, was tatsächlich mitfährt.
+
+**Zwei Fehler, die nur die Tests gefunden haben:**
+
+1. **Jedes `POST /pakete` antwortete mit 404** — obwohl das Paket entstand.
+   `legePaketAn` las die neue Zeile mit `findePaket()` **innerhalb** der
+   offenen Transaktion, aber über `db()` statt `tx`: dort ist sie noch nicht
+   sichtbar. Im Betrieb hätte der Benutzer einen Fehler gesehen, es erneut
+   versucht — und wäre an der Namensdublette hängengeblieben. Jetzt erst
+   committen, dann lesen (dasselbe Muster wie `buche()`).
+2. **Meine erste Gegenprobe blieb grün.** Der Test für „alles oder nichts"
+   hing an der zufälligen UUID-Reihenfolge: Lag das defekte Gerät vorn, war
+   ohnehin nichts gebucht — auch ohne Transaktionsklammer. Jetzt werden drei
+   Geräte angelegt, nach Id sortiert und das **letzte** auf defekt gesetzt;
+   damit sind garantiert zwei gebucht, bevor der Fehler auftritt.
+   *Merksatz aus AP12, hier zum zweiten Mal bestätigt: Eine Gegenprobe, die
+   grün bleibt, ist ein Befund über den Test.*
+
+**Und einer, der beim Schreiben auffiel:** Bei der Einzelbuchung mit Zubehör
+nahm ich `buchungen[0]` als „eigene" Buchung fürs Zustandsfoto — der Server
+sortiert aber nach Id, das Bild hätte am Löffel statt am Bagger gehangen.
+Jetzt wird die Buchung dieses Geräts gezielt herausgesucht.
+
+**Im Browser abgenommen** (390×844): Sammelmodus ein, zwei Geräte per
+Handeingabe eingelesen, **eines doppelt gescannt und nicht verdoppelt**;
+Zubehör des Baggers automatisch angeboten und vorangehakt; den
+Hydraulikhammer abgewählt → **3 Geräte gebucht**, der Hammer blieb
+verfügbar; in der Datenbank **3 Buchungen mit 0 ms Zeitspanne** (eine
+Transaktion). Paket angelegt, zwei Geräte zugeordnet, „Paket ausgeben" →
+Liste gefüllt samt Zubehör. Erneutes Ausgeben der bereits ausgegebenen
+Geräte → Fehlermeldung mit Namen und Nummer, **kein einziges gebucht**.
+
+**Stand: 407 Tests** (377 Server, 30 Oberfläche), 23 Schutzregeln, ESLint,
+beide Typprüfungen und die Oberflächenprüfung grün.
+
+**Bewusst nicht gebaut:** kein Paket-Bestand (ein Paket sagt nie, wo es
+„ist"), kein Zubehör von Zubehör (eine Ebene, wie das Datenmodell), keine
+Teilbuchung.
 
 ## Nächster Schritt
 

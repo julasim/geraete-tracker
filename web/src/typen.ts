@@ -132,6 +132,26 @@ export interface Datei {
   hochgeladen_von_name: string | null;
 }
 
+/** Eine benannte Zusammenstellung von Geräten für die Sammelbuchung. */
+export interface Paket {
+  id: string;
+  name: string;
+  notiz: string | null;
+  aktiv: boolean;
+  rev: number;
+  /** Wie viele Geräte hängen daran? */
+  anzahl: number;
+}
+
+/** Ein Gerät in einem Paket oder als Zubehör — nur, was die Liste zeigt. */
+export interface PaketGeraet {
+  id: string;
+  inventarnummer: string | null;
+  bezeichnung: string;
+  status: GeraetStatus;
+  standort: string | null;
+}
+
 export interface Pruefart {
   id: string;
   name: string;

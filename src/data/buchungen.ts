@@ -10,6 +10,7 @@
  * und beide ausgeben — das Gerät stünde dann an zwei Orten.
  */
 
+import type postgres from "postgres";
 import { db } from "../db/client.js";
 import { NichtGefunden, RegelFehler } from "../api/fehler.js";
 import {
@@ -60,7 +61,68 @@ export interface NeueBuchung {
  * Bucht ein Gerät. Der Kern der Anwendung.
  */
 export async function buche(daten: NeueBuchung, akteurId: string): Promise<BuchungAnsicht> {
-  const id = await db().begin(async (tx) => {
+  const id = await db().begin(async (tx) => bucheInTx(tx, daten, akteurId));
+  return findeBuchung(id);
+}
+
+/**
+ * Mehrere Geräte in EINEM Vorgang buchen — das Bestücken eines Transporters.
+ *
+ * **Alles oder nichts.** Scheitert ein Gerät, wird die ganze Transaktion
+ * zurückgerollt. Der Grund ist nicht Bequemlichkeit, sondern
+ * Nachvollziehbarkeit: Eine halb ausgeführte Sammelbuchung hinterlässt einen
+ * Bestand, den niemand mehr erklären kann — welche fünf der zehn Geräte sind
+ * jetzt draußen? Stattdessen nennt die Fehlermeldung das Gerät beim Namen,
+ * es wird aus der Liste genommen, und der Rest geht durch.
+ *
+ * **Die Sperren werden in fester Reihenfolge geholt** (nach Id sortiert).
+ * Ohne das könnten zwei gleichzeitige Sammelbuchungen mit überlappenden
+ * Geräten einander blockieren — jede hält, worauf die andere wartet. Ein
+ * Deadlock, der genau dann auftritt, wenn zwei Leute morgens gleichzeitig
+ * den Hänger bestücken.
+ */
+export async function bucheMehrere(
+  geraetIds: string[],
+  daten: Omit<NeueBuchung, "geraet_id">,
+  akteurId: string,
+): Promise<BuchungAnsicht[]> {
+  const eindeutig = [...new Set(geraetIds)].sort();
+  if (!eindeutig.length) throw new RegelFehler("Kein Gerät ausgewählt.");
+
+  const ids = await db().begin(async (tx) => {
+    const erzeugt: string[] = [];
+    for (const geraetId of eindeutig) {
+      try {
+        erzeugt.push(await bucheInTx(tx, { ...daten, geraet_id: geraetId }, akteurId));
+      } catch (fehler) {
+        // Ohne den Namen wäre die Meldung bei zehn Geräten wertlos: "Das
+        // Gerät ist defekt" — welches?
+        const [g] = await tx<{ bezeichnung: string; inventarnummer: string | null }[]>`
+          SELECT bezeichnung, inventarnummer FROM geraete WHERE id = ${geraetId}`;
+        const name = g ? `${g.bezeichnung}${g.inventarnummer ? ` (${g.inventarnummer})` : ""}` : "Ein Gerät";
+        if (fehler instanceof RegelFehler) {
+          throw new RegelFehler(`${name}: ${fehler.message}`, fehler.grund);
+        }
+        throw fehler;
+      }
+    }
+    return erzeugt;
+  });
+
+  return Promise.all(ids.map((id) => findeBuchung(id)));
+}
+
+/**
+ * Der eigentliche Buchungsvorgang, innerhalb einer bereits offenen
+ * Transaktion. Einzel- und Sammelbuchung teilen sich ihn, damit die
+ * fachlichen Regeln an genau einer Stelle stehen.
+ */
+async function bucheInTx(
+  tx: postgres.TransactionSql,
+  daten: NeueBuchung,
+  akteurId: string,
+): Promise<string> {
+  {
     // FOR UPDATE sperrt genau diese Gerätezeile bis zum Ende der Transaktion.
     // Ein zweiter Scan wartet hier, liest danach den NEUEN Zustand und wird
     // von pruefeUebergang() korrekt abgewiesen.
@@ -134,9 +196,7 @@ export async function buche(daten: NeueBuchung, akteurId: string): Promise<Buchu
       WHERE id = ${daten.geraet_id}`;
 
     return gebucht[0]!.id;
-  });
-
-  return findeBuchung(id);
+  }
 }
 
 const ANSICHT = () => db()`

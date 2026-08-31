@@ -67,6 +67,38 @@ export const useBestand = defineStore("bestand", () => {
     else standorte.value.push(standort);
   }
 
+  /**
+   * Die Geräte, die gerade für eine Sammelbuchung zusammengetragen werden.
+   *
+   * Bewusst **nur im Arbeitsspeicher**, nicht im localStorage: Eine halb
+   * fertige Sammlung von gestern ist eine Falle — wer die App am nächsten
+   * Morgen öffnet, bucht sonst versehentlich vier Geräte mit, die längst
+   * woanders stehen.
+   */
+  const sammlung = ref<string[]>([]);
+
+  const sammelt = computed(() => sammlung.value.length > 0);
+
+  function sammle(geraetId: string): void {
+    // Zweimal denselben Barcode zu scannen ist der Normalfall, wenn man
+    // zwischendurch abgelenkt wird. Das darf nichts verdoppeln.
+    if (!sammlung.value.includes(geraetId)) sammlung.value.push(geraetId);
+  }
+
+  function entsammle(geraetId: string): void {
+    const i = sammlung.value.indexOf(geraetId);
+    if (i >= 0) sammlung.value.splice(i, 1);
+  }
+
+  function sammlungLeeren(): void {
+    sammlung.value = [];
+  }
+
+  /** Die gesammelten Geräte als Datensätze, in der Reihenfolge des Scannens. */
+  const gesammelteGeraete = computed(() =>
+    sammlung.value.map((id) => geraete.value.find((g) => g.id === id)).filter(Boolean),
+  );
+
   /** Wie ergaenzeStandort, für Lagerplätze. */
   function ergaenzeLagerplatz(platz: Lagerplatz): void {
     const i = lagerplaetze.value.findIndex((p) => p.id === platz.id);
@@ -149,6 +181,7 @@ export const useBestand = defineStore("bestand", () => {
   }
 
   function leeren(): void {
+    sammlung.value = [];
     geraete.value = [];
     standorte.value = [];
     lagerplaetze.value = [];
@@ -168,6 +201,12 @@ export const useBestand = defineStore("bestand", () => {
     zahlen,
     laden,
     ersetze,
+    sammlung,
+    sammelt,
+    sammle,
+    entsammle,
+    sammlungLeeren,
+    gesammelteGeraete,
     ergaenzeStandort,
     ergaenzeLagerplatz,
     ergaenzeSchlagwort,

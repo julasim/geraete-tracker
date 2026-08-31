@@ -207,6 +207,14 @@ async function abmelden(): Promise<void> {
               </button>
             </li>
             <li>
+              <button class="pt-zeile" @click="router.push('/pakete')">
+                <div class="pt-zeile__haupt">
+                  <div class="pt-zeile__titel">Pakete</div>
+                  <div class="pt-zeile__unter">Geräte, die immer gemeinsam hinausgehen</div>
+                </div>
+              </button>
+            </li>
+            <li>
               <button class="pt-zeile" @click="router.push('/stammdaten')">
                 <div class="pt-zeile__haupt">
                   <div class="pt-zeile__titel">Schlagworte und Prüfarten</div>

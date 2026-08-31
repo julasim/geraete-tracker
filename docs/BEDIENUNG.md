@@ -257,6 +257,55 @@ wird als Etikett aufs Regal geklebt und ist beim Scannen die Antwort auf „was
 steht in diesem Regal?". Umbenennen geht jederzeit; die Kennung bleibt dabei
 unangetastet, weil das Etikett ja klebt.
 
+## Mehrere Geräte auf einmal buchen
+
+Beim Bestücken eines Transporters gehen oft zehn Geräte auf dieselbe
+Baustelle. Dafür gibt es den Sammelmodus:
+
+1. Im **Scanner** oben **„Mehrere sammeln"** anhaken.
+2. Alle Geräte nacheinander scannen (oder die Nummern eintippen). Jedes
+   landet in einer Liste statt auf der Gerätekarte — **zweimal gescannt
+   schadet nicht**, es zählt einmal.
+3. Unten **Ausgeben**, *Zurücknehmen* oder *Umbuchen* wählen.
+4. Ziel und Person **einmal** angeben, dann bestätigen.
+
+Ein Gerät wieder aus der Liste nehmen: **Entfernen** in der Zeile.
+
+**Alles oder nichts.** Lässt sich eines der Geräte nicht buchen — weil es
+etwa als defekt gemeldet ist —, wird **keines** gebucht. Die Meldung nennt
+das Gerät mit Namen und Nummer; nehmen Sie es aus der Liste, dann geht der
+Rest durch. Das ist Absicht: Ein halb gebuchter Transporter hinterlässt einen
+Bestand, den hinterher niemand mehr erklären kann.
+
+## Zubehör
+
+Hat ein Gerät Zubehör hinterlegt — etwa Löffel zum Bagger —, wird es beim
+Buchen **vorgeschlagen und ist vorangehakt**. Der Regelfall ist, dass es
+mitfährt. Bleibt ein Teil im Lager, haken Sie es einfach ab; dann bleibt es
+auch im System dort.
+
+Ohne diesen Vorschlag stünde der Löffel weiter im Lager, während er in
+Wahrheit auf der Baustelle liegt — und der Bestand wäre falsch.
+
+*Zubehör wird am Gerät hinterlegt: Gerät öffnen → Bearbeiten → „Gehört zu".*
+
+## Pakete
+
+Fahren zu einer Baustellenart immer dieselben Geräte mit, fassen Sie sie
+unter **Mehr → Pakete** zusammen — etwa „Estrich komplett".
+
+* **Neues Paket** anlegen, dann Geräte über die Suche zuordnen.
+* **Paket ausgeben** füllt die Sammelliste mit allen Geräten des Pakets
+  (samt deren Zubehör) und führt direkt zur Buchung.
+
+Ein Paket ist dabei ein **Vorschlag**, keine feste Einheit: Was gerade nicht
+mitfährt, nehmen Sie vor dem Buchen aus der Liste. Ein Paket sagt auch nie,
+wo etwas steht — das sagt immer das Gerät selbst. Ein Gerät darf in mehreren
+Paketen stecken.
+
+*Pakete anlegen und ändern darf, wer das Recht **Stammdaten pflegen** hat;
+ausgeben darf sie jeder.*
+
 ## Ein Foto bei der Übergabe
 
 Beim Ausgeben, Zurücknehmen und Umbuchen gibt es unter **Zustand festhalten**

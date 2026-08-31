@@ -12,7 +12,7 @@ import { api, ApiError } from "@/api";
 import { useAnmeldung } from "@/stores/anmeldung";
 import { useBestand } from "@/stores/bestand";
 import { useFoto } from "@/composables/useFoto";
-import type { Buchungsart, Geraet, Standort } from "@/typen";
+import type { Buchungsart, Geraet, PaketGeraet, Standort } from "@/typen";
 import Kopf from "@/components/Kopf.vue";
 import StatusChip from "@/components/StatusChip.vue";
 import Symbol from "@/components/Symbol.vue";
@@ -48,6 +48,36 @@ const lagerplatzId = ref("");
  * Nur mit dem Recht `stammdaten.pflegen`; wer es nicht hat, sieht die
  * Auswahl wie bisher.
  */
+/**
+ * Das Zubehör des Geräts — die Löffel zum Bagger.
+ *
+ * Vorangehakt, weil es der Regelfall ist: Wer den Bagger ausgibt, lädt die
+ * Löffel mit auf. Ohne diesen Vorschlag stünden sie im System weiter im
+ * Lager, und der Bestand wäre falsch. Manchmal bleibt der Löffel aber da —
+ * deshalb abwählbar, nicht erzwungen.
+ *
+ * Hat ein Gerät kein Zubehör, ändert sich an dieser Ansicht nichts.
+ */
+const zubehoer = ref<PaketGeraet[]>([]);
+const zubehoerGewaehlt = ref<string[]>([]);
+
+async function zubehoerLaden(): Promise<void> {
+  try {
+    const liste = await api.get<PaketGeraet[]>(`/geraete/${geraetId}/zubehoer`);
+    zubehoer.value = liste;
+    zubehoerGewaehlt.value = liste.map((z) => z.id);
+  } catch {
+    // Ohne Zubehörliste bleibt die Ansicht wie bisher — buchen muss gehen.
+    zubehoer.value = [];
+  }
+}
+
+function zubehoerUmschalten(id: string): void {
+  const i = zubehoerGewaehlt.value.indexOf(id);
+  if (i >= 0) zubehoerGewaehlt.value.splice(i, 1);
+  else zubehoerGewaehlt.value.push(id);
+}
+
 /**
  * Ein Foto vom Zustand bei der Übergabe.
  *
@@ -175,6 +205,7 @@ onMounted(async () => {
   try {
     await bestand.laden();
     geraet.value = await api.get<Geraet>(`/geraete/${geraetId}`);
+    await zubehoerLaden();
 
     // Jeder darf die Namensliste sehen — sonst ließe sich nichts auf jemanden
     // buchen. Ohne das Recht "benutzer.verwalten" liefert die Route nur
@@ -198,6 +229,43 @@ async function buchen(): Promise<void> {
   speichert.value = true;
   fehler.value = null;
   try {
+    /**
+     * Geht Zubehör mit, ist es fachlich eine Sammelbuchung — dieselbe
+     * Transaktion, dieselbe Alles-oder-nichts-Regel. Sonst könnte der Bagger
+     * draußen stehen und der Löffel laut System im Lager, weil ein zweiter
+     * Aufruf scheiterte.
+     */
+    if (zubehoerGewaehlt.value.length) {
+      const sammel = await api.post<{
+        geraete: Geraet[];
+        buchungen: { id: string; geraet_id: string }[];
+      }>(
+        "/buchungen/sammel",
+        {
+          geraet_ids: [geraetId, ...zubehoerGewaehlt.value],
+          art,
+          nach_standort_id: standortId.value || null,
+          nach_lagerplatz_id: lagerplatzId.value || null,
+          empfaenger_id: fremdfirma.value ? null : empfaengerId.value || null,
+          empfaenger_freitext: fremdfirma.value ? empfaengerFrei.value : null,
+          geplante_rueckgabe: rueckgabe.value || null,
+          notiz: notiz.value || null,
+        },
+      );
+      for (const g of sammel.geraete) bestand.ersetze(g);
+      const eigenes = sammel.geraete.find((g) => g.id === geraetId);
+      if (eigenes) geraet.value = eigenes;
+      localStorage.setItem(`${LETZTER_ORT}-${art}`, standortId.value);
+
+      // Die Buchung DIESES Geräts heraussuchen, nicht die erste: Der Server
+      // sortiert nach Id, das Foto hinge sonst womöglich am Löffel statt am
+      // Bagger.
+      const eigeneBuchung = sammel.buchungen.find((b) => b.geraet_id === geraetId);
+      if (fotoDatei.value && eigeneBuchung?.id) await fotoHochladen(eigeneBuchung.id);
+      fertig.value = true;
+      return;
+    }
+
     const antwort = await api.post<{ geraet: Geraet; buchung: { id: string } }>("/buchungen", {
       geraet_id: geraetId,
       art,
@@ -398,6 +466,31 @@ async function buchen(): Promise<void> {
               <small>Es wird gesperrt und lässt sich nicht mehr ausgeben.</small>
             </span>
           </label>
+        </div>
+
+        <!--
+          Zubehör: nur sichtbar, wenn es welches gibt. Vorangehakt, weil es
+          der Regelfall ist — der Löffel fährt mit dem Bagger.
+        -->
+        <div v-if="zubehoer.length" class="feldgruppe">
+          <span class="pt-label">Zubehör mitnehmen</span>
+          <ul class="pt-liste zubehoer">
+            <li v-for="z in zubehoer" :key="z.id" class="zubehoer__zeile">
+              <label class="haken">
+                <input
+                  type="checkbox"
+                  class="haken__feld"
+                  :checked="zubehoerGewaehlt.includes(z.id)"
+                  @change="zubehoerUmschalten(z.id)"
+                />
+                <span>
+                  <span class="pt-zeile__titel">{{ z.bezeichnung }}</span>
+                  <span class="pt-zeile__unter pt-mono">{{ z.inventarnummer }}</span>
+                </span>
+              </label>
+              <StatusChip :status="z.status" />
+            </li>
+          </ul>
         </div>
 
         <div class="feldgruppe">
@@ -604,5 +697,32 @@ async function buchen(): Promise<void> {
   height: 1px;
   opacity: 0;
   pointer-events: none;
+}
+.zubehoer {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.zubehoer__zeile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+}
+.haken {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  min-height: 48px;
+  cursor: pointer;
+}
+.haken__feld {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+.haken span span {
+  display: block;
 }
 </style>
