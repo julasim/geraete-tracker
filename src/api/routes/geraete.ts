@@ -3,8 +3,13 @@
  *
  * Was hier NICHT passiert: den Zustand ändern. Standort, Lagerplatz und
  * Nutzer ergeben sich ausschließlich aus Buchungen (AP5). Gäbe es hier
- * einen Weg, den Standort direkt zu setzen, liefe er an der Historie vorbei —
- * und die Historie wäre nicht mehr die Wahrheit.
+ * einen Weg, den Standort nachträglich zu setzen, liefe er an der Historie
+ * vorbei — und die Historie wäre nicht mehr die Wahrheit. `PATCH` kennt
+ * `standort_id` und `lagerplatz_id` deshalb nicht.
+ *
+ * Die eine Ausnahme ist das ANLEGEN: Dort sind Ort und Platz der
+ * Anfangswert, kein Übergang — es gibt keinen Vorzustand, von dem etwas
+ * abweichen könnte. Begründung ausführlich in `data/geraete.ts`.
  */
 
 import { Hono } from "hono";
@@ -86,7 +91,11 @@ const neuSchema = z.object({
   anschaffungswert: z.number().nonnegative().nullish(),
   notiz: z.string().max(4000).nullish(),
   betriebsstunden: z.number().nonnegative().nullish(),
+  // Ort und Platz sind hier erlaubt, in `aenderungSchema` bewusst nicht:
+  // Beim Anlegen ist das der Anfangswert, danach ergibt sich beides
+  // ausschließlich aus Buchungen.
   standort_id: z.string().uuid().nullish(),
+  lagerplatz_id: z.string().uuid().nullish(),
   schlagworte: z.array(z.string().uuid()).optional(),
 });
 

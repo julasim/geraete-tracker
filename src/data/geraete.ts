@@ -11,6 +11,7 @@ import { db } from "../db/client.js";
 import { KonfliktFehler, NichtGefunden, RegelFehler } from "../api/fehler.js";
 import { codeArt, normalisiere, suchVarianten } from "../domain/barcode.js";
 import { naechsteFreieNummerInTx, vergibNummerInTx } from "./nummern.js";
+import { pruefePlatzZuStandortInTx } from "./stammdaten.js";
 
 export type GeraetStatus =
   | "verfuegbar"
@@ -168,14 +169,23 @@ export interface NeuesGeraet {
   notiz?: string | null;
   betriebsstunden?: number | null;
   standort_id?: string | null;
+  lagerplatz_id?: string | null;
   schlagworte?: string[];
 }
 
 /**
- * Legt ein Gerät an, vergibt das Etikett und setzt den Anfangsstandort.
+ * Legt ein Gerät an, vergibt das Etikett und setzt den Anfangsstandort —
+ * seit AP25 samt Lagerplatz.
  *
  * Alles in einer Transaktion: ein Gerät ohne Etikett wäre nicht auffindbar,
  * ein Etikett ohne Gerät ein Geist.
+ *
+ * **Warum Ort und Platz hier direkt geschrieben werden und keine
+ * Eingangsbuchung entsteht:** Beim Anlegen gibt es keinen Vorzustand, von dem
+ * etwas abweichen könnte — es ist kein Übergang, sondern der Anfangswert. Die
+ * Kette bleibt trotzdem geschlossen, weil `bucheInTx` als `von_standort_id`
+ * den aktuellen Ort des Geräts schreibt: Die erste echte Buchung nimmt den
+ * hier gesetzten Ort als Herkunft auf. Es fehlt kein Glied, nur das nullte.
  */
 export async function legeGeraetAn(daten: NeuesGeraet, akteurId: string): Promise<GeraetAnsicht> {
   const bezeichnung = daten.bezeichnung.trim();
@@ -236,15 +246,37 @@ export async function legeGeraetAn(daten: NeuesGeraet, akteurId: string): Promis
       }
     }
 
+    /**
+     * Ort und Platz prüfen, bevor sie ins Gerät gehen.
+     *
+     * Die Standortprüfung ist keine Zugabe: Eine unbekannte UUID liefe sonst
+     * in den Fremdschlüsselfehler `23503`, und den übersetzt `api/server.ts`
+     * nicht — der Benutzer bekäme einen 500er statt einer Auskunft. Der Zweig
+     * gehört auch nicht dorthin: Er wirkte auf alle Routen und verwandelte
+     * laute Fehler in leise. Also hier, wo bekannt ist, worum es geht.
+     *
+     * Der Inline-SELECT läuft auf `tx`, nicht über `findeStandort()` — das
+     * geht über `db()` und damit an der offenen Transaktion vorbei.
+     */
+    if (daten.standort_id) {
+      const [ort] = await tx`SELECT id FROM standorte WHERE id = ${daten.standort_id}`;
+      if (!ort) throw new NichtGefunden("Standort");
+    }
+    if (daten.lagerplatz_id) {
+      await pruefePlatzZuStandortInTx(tx, daten.lagerplatz_id, daten.standort_id ?? null);
+    }
+
     const zeilen = await tx<{ id: string }[]>`
       INSERT INTO geraete (inventarnummer, bezeichnung, hersteller, modell, seriennummer,
                            anschaffungsdatum, anschaffungswert, notiz, betriebsstunden,
-                           aktueller_standort_id, created_by, updated_by)
+                           aktueller_standort_id, aktueller_lagerplatz_id,
+                           created_by, updated_by)
       VALUES (${nummer}, ${bezeichnung}, ${daten.hersteller ?? null}, ${daten.modell ?? null},
               ${daten.seriennummer ?? null}, ${daten.anschaffungsdatum ?? null},
               ${daten.anschaffungswert ?? null}, ${daten.notiz ?? null},
               ${daten.betriebsstunden ?? null},
-              ${daten.standort_id ?? null}, ${akteurId}, ${akteurId})
+              ${daten.standort_id ?? null}, ${daten.lagerplatz_id ?? null},
+              ${akteurId}, ${akteurId})
       RETURNING id`;
     const neueId = zeilen[0]!.id;
 

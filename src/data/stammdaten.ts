@@ -4,6 +4,7 @@
  * Alles drei legt der Betrieb selbst an — nichts ist vorgegeben.
  */
 
+import type postgres from "postgres";
 import { db } from "../db/client.js";
 import { naechsterPlatzCode, normalisiere, PLATZ_PRAEFIX } from "../domain/barcode.js";
 import { NichtGefunden, RegelFehler } from "../api/fehler.js";
@@ -215,6 +216,49 @@ export async function findeLagerplatz(id: string): Promise<Lagerplatz> {
       FROM lagerplaetze WHERE id = ${id}`;
   if (!zeilen[0]) throw new NichtGefunden("Lagerplatz");
   return zeilen[0];
+}
+
+/**
+ * Ein Regal gehört zu genau einem Ort — diese Regel steht hier und sonst
+ * nirgends.
+ *
+ * Sie gilt an zwei Stellen: beim Buchen und beim Anlegen eines Geräts. Zwei
+ * Fassungen derselben Regel laufen früher oder später auseinander, und dann
+ * verhindert die eine, was die andere durchlässt: ein Gerät, das laut Bestand
+ * auf einer Baustelle in einem Regal des Bauhofs liegt. Das fällt niemandem
+ * auf, weil nichts meldet.
+ *
+ * **`tx` und niemals `db()`.** Die Zeile, gegen die geprüft wird, kann in
+ * derselben, noch offenen Transaktion entstanden sein; eine Abfrage über
+ * `db()` liefe daran vorbei und sähe sie nicht. Genau das führte in AP23
+ * dazu, dass jedes erfolgreiche `POST /pakete` mit 404 antwortete.
+ */
+export async function pruefePlatzZuStandortInTx(
+  tx: postgres.TransactionSql,
+  lagerplatzId: string,
+  standortId: string | null,
+): Promise<void> {
+  const [platz] = await tx<{ standort_id: string }[]>`
+    SELECT standort_id FROM lagerplaetze WHERE id = ${lagerplatzId}`;
+  if (!platz) throw new NichtGefunden("Lagerplatz");
+
+  // Der Satz muss in zwei Lagen tragen: beim Anlegen hat der Benutzer den
+  // Ort noch gar nicht gewählt, beim Buchen sehr wohl — dort hat nur das
+  // Gerät keinen. Er benennt deshalb die Bedingung, nicht das Formularfeld.
+  if (!standortId) {
+    throw new RegelFehler(
+      "Ein Lagerplatz gehört immer zu einem Standort — bitte auch angeben, " +
+        "an welchem Standort das Gerät steht.",
+      "platz_ohne_standort",
+    );
+  }
+
+  if (platz.standort_id !== standortId) {
+    throw new RegelFehler(
+      "Der gewählte Lagerplatz gehört zu einem anderen Standort.",
+      "platz_falscher_standort",
+    );
+  }
 }
 
 export async function findeLagerplatzNachCode(code: string): Promise<Lagerplatz | null> {

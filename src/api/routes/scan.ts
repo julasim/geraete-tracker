@@ -35,7 +35,7 @@ scanRouten.get("/scan/:code", async (c) => {
   // zusammengefasst: Eine eigene Rolle kann genau eines davon tragen.
   const darfGeraetAnlegen = hatRechtImKontext(c, "geraete.pflegen");
   const darfPlatzAnlegen = hatRechtImKontext(c, "stammdaten.pflegen");
-  const darfKorrigieren = hatRechtImKontext(c, "buchungen.korrigieren");
+  const darfBuchen = hatRechtImKontext(c, "buchungen.erfassen");
 
   const art = codeArt(code);
 
@@ -128,7 +128,7 @@ scanRouten.get("/scan/:code", async (c) => {
     typ: "geraet" as const,
     code,
     geraet,
-    aktionen: erlaubteAktionen(geraet.status, darfKorrigieren),
+    aktionen: erlaubteAktionen(geraet.status, darfBuchen),
     hinweis: hinweisZuStatus(geraet.status),
     letzteBuchung: letzte ?? null,
     // Warnungen gehören auf die Gerätekarte, nicht in eine Liste, die

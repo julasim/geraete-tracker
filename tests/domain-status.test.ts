@@ -113,29 +113,45 @@ describe("Folgezustand", () => {
 });
 
 describe("Angebotene Aktionen", () => {
+  // Der zweite Parameter ist seit AP25 das Recht `buchungen.erfassen`, nicht
+  // mehr `buchungen.korrigieren`. Er hat bewusst keinen Standardwert: Mit
+  // `= true` bekäme ein Aufrufer, der ihn vergisst, still alle Aktionen.
   it("bietet bei einem verfügbaren Gerät das Ausgeben an", () => {
-    const arten = erlaubteAktionen("verfuegbar", false).map((a) => a.art);
+    const arten = erlaubteAktionen("verfuegbar", true).map((a) => a.art);
     expect(arten).toContain("ausgabe");
     expect(arten).not.toContain("ruecknahme");
   });
 
   it("bietet bei einem ausgegebenen Gerät Rücknahme und Umbuchung an", () => {
-    const arten = erlaubteAktionen("ausgegeben", false).map((a) => a.art);
+    const arten = erlaubteAktionen("ausgegeben", true).map((a) => a.art);
     expect(arten).toEqual(expect.arrayContaining(["ruecknahme", "umbuchung"]));
     expect(arten).not.toContain("ausgabe");
   });
 
   it("bietet bei einem defekten Gerät keine Buchung an", () => {
-    expect(erlaubteAktionen("defekt", false)).toHaveLength(0);
+    expect(erlaubteAktionen("defekt", true)).toHaveLength(0);
   });
 
   it("bietet bei einem ausgemusterten Gerät gar nichts an, auch dem Admin nicht", () => {
     expect(erlaubteAktionen("ausgemustert", true)).toHaveLength(0);
   });
 
-  it("bietet nur dem Admin das Berichtigen an", () => {
-    expect(erlaubteAktionen("verfuegbar", true).map((a) => a.art)).toContain("korrektur");
-    expect(erlaubteAktionen("verfuegbar", false).map((a) => a.art)).not.toContain("korrektur");
+  it("bietet ohne das Recht zu buchen gar nichts an", () => {
+    // Sonst zeigt die Oberfläche Knöpfe, die der Server mit 403 abweist —
+    // der Benutzer erfährt erst nach dem Tippen, dass er nicht darf.
+    for (const zustand of ALLE_ZUSTAENDE) {
+      expect(erlaubteAktionen(zustand, false)).toEqual([]);
+    }
+  });
+
+  it("bietet das Berichtigen nirgends mehr an", () => {
+    // Der Knopf führte auf ein POST /buchungen mit art "korrektur", und das
+    // Schema dieser Route kennt die Art nicht — die Antwort war immer 400.
+    for (const zustand of ALLE_ZUSTAENDE) {
+      for (const recht of [true, false]) {
+        expect(erlaubteAktionen(zustand, recht).map((a) => a.art)).not.toContain("korrektur");
+      }
+    }
   });
 
   it("kennzeichnet genau eine Hauptaktion, damit die Oberfläche sie hervorheben kann", () => {

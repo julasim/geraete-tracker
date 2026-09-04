@@ -212,8 +212,10 @@ await schritt("defektes Gerät lässt sich nicht ausgeben", async () => {
 await schritt("Scan zeigt den Grund und bietet keine Buchung mehr an", async () => {
   const a = await anfrage(`/api/scan/${nummer}`);
   const arten = a.json.aktionen.map((x) => x.art);
-  // Buchen geht nicht mehr. "korrektur" darf erscheinen — dieser Durchlauf
-  // läuft als Admin, und Berichtigen ist genau der Weg aus dem Zustand heraus.
+  // Buchen geht nicht mehr. Auch "korrektur" erscheint nicht mehr: Der Knopf
+  // "Bestand berichtigen" führte auf einen Weg, den der Server gar nicht
+  // annimmt (buchungsSchema kennt die Art nicht), und ist entfernt. Die
+  // Gegenbuchung läuft nur noch über die Schnittstelle.
   for (const gesperrt of ["ausgabe", "ruecknahme", "umbuchung"]) {
     behaupte(!arten.includes(gesperrt), `"${gesperrt}" wird trotzdem angeboten`);
   }

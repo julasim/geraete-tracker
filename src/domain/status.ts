@@ -25,8 +25,18 @@ import { RegelFehler } from "../api/fehler.js";
 export type Status = "verfuegbar" | "ausgegeben" | "wartung" | "defekt" | "ausgemustert";
 export type Buchungsart = "ausgabe" | "ruecknahme" | "umbuchung" | "korrektur";
 
-/** Aus welchen Zuständen heraus eine Buchungsart erlaubt ist. */
-const ERLAUBT: Record<Buchungsart, Status[]> = {
+/**
+ * Aus welchen Zuständen heraus eine Buchungsart erlaubt ist.
+ *
+ * Exportiert, weil die Oberfläche eine Zweitschrift davon hält
+ * (`web/src/composables/useZubehoerwahl.ts`): Sie soll kein Zubehör
+ * vorschlagen, das der Server anschließend ablehnen muss — sonst scheitert
+ * eine Alles-oder-nichts-Buchung an einem Teil, das der Benutzer nie
+ * angefasst hat. Durchgesetzt wird die Regel weiterhin nur hier; ein Test
+ * hält beide Seiten zusammen, wie es `tests/domain-rechte.test.ts` für die
+ * Rechtelisten vormacht.
+ */
+export const ERLAUBT: Record<Buchungsart, Status[]> = {
   ausgabe: ["verfuegbar"],
   ruecknahme: ["ausgegeben"],
   umbuchung: ["ausgegeben"],
@@ -95,12 +105,21 @@ export interface Aktion {
  * Oberfläche und Regelwerk früher oder später auseinander, und der
  * Benutzer tippt auf einen Knopf, der dann eine Fehlermeldung liefert.
  *
- * `darfKorrigieren` ist das Recht `buchungen.korrigieren`, nicht mehr eine
- * Rolle: Seit AP10 gibt es eigene Rollen, und ob jemand berichtigen darf,
- * ergibt sich nur aus seinen Rechten.
+ * `darfBuchen` ist das Recht `buchungen.erfassen`. **Ohne Standardwert, und
+ * das ist der Punkt:** Mit `= true` bekäme ein künftiger Aufrufer, der den
+ * Parameter vergisst, still alle Aktionen — der Schutz wäre wirkungslos, ohne
+ * dass irgendwo etwas meldet. So zwingt der Übersetzer jeden Aufrufer zur
+ * Entscheidung, und die Gegenprobe "Parameter weglassen" wird ein Typfehler
+ * statt eines stillen `true`.
  */
-export function erlaubteAktionen(status: Status, darfKorrigieren: boolean): Aktion[] {
+export function erlaubteAktionen(status: Status, darfBuchen: boolean): Aktion[] {
   const aktionen: Aktion[] = [];
+
+  // Alles, was diese Liste anbietet, ist eine Buchung. Ohne das Recht bleibt
+  // sie leer — sonst zeigt die Oberfläche Knöpfe, die der Server anschließend
+  // mit 403 abweist, und der Benutzer erfährt erst nach dem Tippen, dass er
+  // nicht darf.
+  if (!darfBuchen) return aktionen;
 
   switch (status) {
     case "verfuegbar":
@@ -119,9 +138,16 @@ export function erlaubteAktionen(status: Status, darfKorrigieren: boolean): Akti
       break;
   }
 
-  if (darfKorrigieren && status !== "ausgemustert") {
-    aktionen.push({ art: "korrektur", text: "Bestand berichtigen", hauptaktion: false });
-  }
+  /**
+   * "Bestand berichtigen" wird hier bewusst NICHT mehr angeboten.
+   *
+   * Der Knopf hat nie funktioniert: Er führte auf einen Weg, der ein
+   * `POST /buchungen` mit `art: "korrektur"` abschickte, und `buchungsSchema`
+   * in `api/routes/buchungen.ts` kennt nur ausgabe/ruecknahme/umbuchung — die
+   * Antwort war 400. Berichtigt wird über `POST /buchungen/korrektur`, und
+   * das ist ein eigener Vorgang mit Pflicht-Begründung, keine Folgeaktion
+   * eines Scans.
+   */
 
   return aktionen;
 }

@@ -13,6 +13,7 @@
 import type postgres from "postgres";
 import { db } from "../db/client.js";
 import { NichtGefunden, RegelFehler } from "../api/fehler.js";
+import { pruefePlatzZuStandortInTx } from "./stammdaten.js";
 import {
   folgeStatus,
   pruefeUebergang,
@@ -103,6 +104,9 @@ export async function bucheMehrere(
         if (fehler instanceof RegelFehler) {
           throw new RegelFehler(`${name}: ${fehler.message}`, fehler.grund);
         }
+        // Ein `NichtGefunden` geht ohne Namen hinaus, und das ist richtig:
+        // Ein unbekannter Lagerplatz oder Standort gilt für alle Geräte
+        // gleich — ein Gerätename davor wiese in die falsche Richtung.
         throw fehler;
       }
     }
@@ -155,18 +159,23 @@ async function bucheInTx(
       const [ort] = await tx`SELECT id FROM standorte WHERE id = ${daten.nach_standort_id}`;
       if (!ort) throw new NichtGefunden("Standort");
     }
+    /**
+     * Der EFFEKTIVE Zielstandort, nicht der angegebene.
+     *
+     * Fehlt `nach_standort_id`, bleibt das Gerät stehen, wo es steht — dann
+     * muss der Platz zu DIESEM Ort gehören. Vorher wurde die Regel in genau
+     * dem Fall übersprungen: Eine Rücknahme mit `nach_lagerplatz_id` und ohne
+     * `nach_standort_id` legte ein Gerät, das auf einer Baustelle steht, in
+     * ein Regal im Bauhof. Ort und Platz widersprachen sich, ohne Meldung.
+     *
+     * Hat das Gerät gar keinen Ort (so legt der CSV-Import an), ist der
+     * effektive Zielstandort `null` und die Buchung wird abgewiesen. Das ist
+     * gewollt: Ein Platz ohne Ort ist kein halber Bestand, sondern ein
+     * falscher.
+     */
+    const zielStandortId = daten.nach_standort_id ?? geraet.aktueller_standort_id;
     if (daten.nach_lagerplatz_id) {
-      const [platz] = await tx<{ standort_id: string }[]>`
-        SELECT standort_id FROM lagerplaetze WHERE id = ${daten.nach_lagerplatz_id}`;
-      if (!platz) throw new NichtGefunden("Lagerplatz");
-      // Ein Regal gehört zu einem Ort. Beides gleichzeitig anzugeben und
-      // dabei durcheinanderzubringen, wäre eine stille Falschbuchung.
-      if (daten.nach_standort_id && platz.standort_id !== daten.nach_standort_id) {
-        throw new RegelFehler(
-          "Der gewählte Lagerplatz gehört zu einem anderen Standort.",
-          "platz_falscher_standort",
-        );
-      }
+      await pruefePlatzZuStandortInTx(tx, daten.nach_lagerplatz_id, zielStandortId);
     }
 
     const neuerStatus = folgeStatus(geraet.status, daten.art, daten.ausfall === true);
@@ -189,7 +198,7 @@ async function bucheInTx(
     await tx`
       UPDATE geraete SET
         status                  = ${neuerStatus},
-        aktueller_standort_id   = ${daten.nach_standort_id ?? geraet.aktueller_standort_id},
+        aktueller_standort_id   = ${zielStandortId},
         aktueller_lagerplatz_id = ${daten.nach_lagerplatz_id ?? null},
         aktueller_nutzer_id     = ${behaeltNutzer ? (daten.empfaenger_id ?? null) : null},
         rev = rev + 1, updated_at = NOW(), updated_by = ${akteurId}
@@ -292,27 +301,49 @@ export async function korrigiere(
   }
 
   const id = await db().begin(async (tx) => {
-    const zeilen = await tx<{ status: Status; aktueller_standort_id: string | null }[]>`
-      SELECT status, aktueller_standort_id FROM geraete WHERE id = ${daten.geraet_id} FOR UPDATE`;
+    const zeilen = await tx<
+      {
+        status: Status;
+        aktueller_standort_id: string | null;
+        aktueller_lagerplatz_id: string | null;
+      }[]
+    >`SELECT status, aktueller_standort_id, aktueller_lagerplatz_id
+        FROM geraete WHERE id = ${daten.geraet_id} FOR UPDATE`;
     const geraet = zeilen[0];
     if (!geraet) throw new NichtGefunden("Gerät");
 
     pruefeUebergang(geraet.status, "korrektur");
 
+    /**
+     * Wechselt der Ort, wird der Lagerplatz frei.
+     *
+     * Sonst bliebe ein Regal des alten Orts am Gerät stehen — genau der
+     * Widerspruch, den `pruefePlatzZuStandortInTx` beim Buchen verhindert.
+     * Ein neues Regal kann die Korrektur nicht setzen: `korrekturSchema`
+     * kennt kein `nach_lagerplatz_id`, hier geht es allein ums Zurücksetzen.
+     *
+     * Die Bedingung steht bewusst in JavaScript und nicht als `CASE` im SQL:
+     * Ein falsch formuliertes `CASE` löschte den Lagerplatz bei JEDER
+     * Korrektur, und das fiele erst auf, wenn jemand ein Regal sucht.
+     */
+    const zielStandortId = daten.nach_standort_id ?? geraet.aktueller_standort_id;
+    const ortWechselt = zielStandortId !== geraet.aktueller_standort_id;
+
     const gebucht = await tx<{ id: string }[]>`
       INSERT INTO buchungen (geraet_id, art, von_standort_id, nach_standort_id,
                              empfaenger_id, erfasst_von, notiz, storniert_durch)
       VALUES (${daten.geraet_id}, 'korrektur', ${geraet.aktueller_standort_id},
-              ${daten.nach_standort_id ?? geraet.aktueller_standort_id},
+              ${zielStandortId},
               ${daten.empfaenger_id ?? null}, ${akteurId}, ${begruendung},
               ${daten.storniert_durch ?? null})
       RETURNING id`;
 
     await tx`
       UPDATE geraete SET
-        status                = ${daten.neuer_status},
-        aktueller_standort_id = ${daten.nach_standort_id ?? geraet.aktueller_standort_id},
-        aktueller_nutzer_id   = ${daten.empfaenger_id ?? null},
+        status                  = ${daten.neuer_status},
+        aktueller_standort_id   = ${zielStandortId},
+        aktueller_lagerplatz_id = ${ortWechselt ? null : geraet.aktueller_lagerplatz_id},
+        aktueller_nutzer_id     = ${daten.empfaenger_id ?? null},
         rev = rev + 1, updated_at = NOW(), updated_by = ${akteurId}
       WHERE id = ${daten.geraet_id}`;
 

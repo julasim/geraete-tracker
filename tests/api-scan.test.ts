@@ -4,8 +4,9 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { schliesseDb } from "../src/db/client.js";
-import { mitCookie } from "./helpers/konten.js";
+import { db, schliesseDb } from "../src/db/client.js";
+import { entsperre, legeKontoAn, meldeAn, raeumeKontoAuf, mitCookie } from "./helpers/konten.js";
+import type { TestKonto } from "./helpers/konten.js";
 import {
   alsAdmin,
   alsMitarbeiter,
@@ -16,14 +17,20 @@ import {
 
 let admin: Sitzung;
 let mitarbeiter: Sitzung;
+/** Jemand ohne `buchungen.erfassen` — für die Rechteprüfung der Aktionsliste. */
+let leser: Sitzung;
+let leserKonto: TestKonto;
 let lagerId: string;
 let baustelleId: string;
 let regalCode: string;
+
+const LESER_ROLLE = "test-scan-leser";
 
 beforeAll(async () => {
   await raeumeTestdatenAuf();
   admin = await alsAdmin();
   mitarbeiter = await alsMitarbeiter();
+  leser = await alsLeser();
 
   lagerId = (await erstelle("/api/standorte", { name: "TEST-Bauhof", typ: "lager" })).id;
   baustelleId = (await erstelle("/api/standorte", { name: "TEST-Baustelle", typ: "baustelle" })).id;
@@ -37,8 +44,32 @@ beforeAll(async () => {
 afterAll(async () => {
   await raeumeTestdatenAuf();
   await raeumeKontenAuf();
+  // Erst das Konto, dann die Rolle — der Fremdschlüssel benutzer.rolle
+  // verhindert die umgekehrte Reihenfolge.
+  if (leserKonto) await raeumeKontoAuf(leserKonto);
+  await db()`DELETE FROM rollen WHERE id = ${LESER_ROLLE}`;
   await schliesseDb();
 });
+
+/**
+ * Eine Sitzung mit einer Rolle ganz ohne Rechte.
+ *
+ * Die Rolle entsteht direkt in der Tabelle statt über `POST /rollen`: Was
+ * hier geprüft wird, ist die Aktionsliste des Scans, nicht die
+ * Rollenverwaltung — ein zweiter Endpunkt dazwischen wäre eine weitere
+ * Stelle, an der der Test aus dem falschen Grund rot werden kann.
+ */
+async function alsLeser(): Promise<Sitzung> {
+  await db()`
+    INSERT INTO rollen (id, name, beschreibung, rechte)
+    VALUES (${LESER_ROLLE}, 'Nur ansehen', 'Sieht den Bestand, bucht nicht.', '{}')
+    ON CONFLICT (id) DO UPDATE SET rechte = '{}'`;
+  leserKonto = await legeKontoAn({ rolle: LESER_ROLLE });
+  await entsperre(leserKonto.id);
+  const { cookie } = await meldeAn(leserKonto.benutzername, leserKonto.passwort);
+  if (!cookie) throw new Error("Anmeldung des Lesers fehlgeschlagen");
+  return { konto: leserKonto, cookie };
+}
 
 async function sende(pfad: string, sitzung: Sitzung, methode = "GET", koerper?: unknown) {
   const antwort = await mitCookie(pfad, sitzung.cookie, {
@@ -152,16 +183,42 @@ describe("Gerät scannen", () => {
     expect(letzte.erfasser).toBeTruthy();
   });
 
-  it("meldet die Aktionen des Admins zusätzlich", async () => {
+  it("bietet niemandem mehr das Berichtigen an, auch dem Admin nicht", async () => {
+    // Der Knopf hat nie funktioniert: Er schickte ein POST /buchungen mit
+    // art "korrektur", und dessen Schema kennt nur ausgabe, ruecknahme und
+    // umbuchung — die Antwort war 400. Berichtigt wird über
+    // POST /buchungen/korrektur, mit Begründung.
     await erstelle("/api/geraete", { bezeichnung: "TEST-FuerAdmin", inventarnummer: "90061" });
 
-    const alsMa = await scan("90061", mitarbeiter);
-    const alsAd = await scan("90061", admin);
+    for (const sitzung of [mitarbeiter, admin]) {
+      const { daten } = await scan("90061", sitzung);
+      const arten = (daten as { aktionen: { art: string }[] }).aktionen.map((a) => a.art);
+      expect(arten).not.toContain("korrektur");
+    }
+  });
 
-    const artenMa = (alsMa.daten as { aktionen: { art: string }[] }).aktionen.map((a) => a.art);
-    const artenAd = (alsAd.daten as { aktionen: { art: string }[] }).aktionen.map((a) => a.art);
-    expect(artenMa).not.toContain("korrektur");
-    expect(artenAd).toContain("korrektur");
+  it("bietet ohne das Recht zu buchen gar keine Aktion an", async () => {
+    // Am Handy erschienen die Buchungsknöpfe bisher für jeden Angemeldeten;
+    // der Server wies sie danach mit 403 ab. Kein Loch, aber ein Knopf, der
+    // für diesen Benutzer nie funktioniert.
+    await erstelle("/api/geraete", {
+      bezeichnung: "TEST-FuerLeser",
+      inventarnummer: "90062",
+      standort_id: lagerId,
+    });
+
+    const mitRecht = await scan("90062", mitarbeiter);
+    const ohneRecht = await scan("90062", leser);
+
+    expect(ohneRecht.status).toBe(200);
+    // Lesen ist kein Recht: Das Gerät sieht er sehr wohl.
+    expect((ohneRecht.daten as { geraet: { id: string } }).geraet.id).toBeTruthy();
+    expect((ohneRecht.daten as { aktionen: unknown[] }).aktionen).toEqual([]);
+    // Gegenstück, damit der Test nicht bloß beweist, dass die Liste immer
+    // leer ist: Mit dem Recht steht "ausgabe" darin.
+    expect((mitRecht.daten as { aktionen: { art: string }[] }).aktionen.map((a) => a.art)).toContain(
+      "ausgabe",
+    );
   });
 });
 
