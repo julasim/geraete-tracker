@@ -7,10 +7,16 @@
  * der Handykamera deutlich fehleranfälliger als QR-Codes, und ein
  * verschmutztes Etikett auf einer gewölbten Fläche im Gegenlicht liest
  * keine Kamera zuverlässig.
+ *
+ * **Diese Ansicht ist die Landeseite für jeden Benutzer**, auch am
+ * Schreibtisch (`/` leitet hierher, und der Wächter schickt Unbekanntes
+ * ebenfalls hierher). Was hier steht, sieht also wirklich jeder — deshalb
+ * hängen Buchungs- und Sammelknöpfe an `buchungen.erfassen`.
  */
 import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { api, ApiError } from "@/api";
+import { darfNach } from "@/rechte-pfade";
 import { useBestand } from "@/stores/bestand";
 import { useScanner } from "@/composables/useScanner";
 import type { Geraet, ScanErgebnis } from "@/typen";
@@ -20,6 +26,15 @@ import StatusChip from "@/components/StatusChip.vue";
 const router = useRouter();
 const bestand = useBestand();
 const scanner = useScanner();
+
+/**
+ * Darf dieser Benutzer überhaupt buchen?
+ *
+ * Beide Ziele — `/buchen/:id/:art` und `/sammeln/:art` — verlangen
+ * `buchungen.erfassen`. Gefragt wird über den Zielpfad statt über das Recht,
+ * damit Knopf und Route nicht getrennt gepflegt werden müssen.
+ */
+const darfBuchen = computed(() => darfNach("/sammeln/ausgabe"));
 
 const videoEl = ref<HTMLVideoElement | null>(null);
 const eingabe = ref("");
@@ -110,6 +125,18 @@ const ohneKamera = computed(() =>
 );
 
 /**
+ * Die Buchungsknöpfe auf der Trefferkarte.
+ *
+ * Welche Buchung fachlich möglich ist, sagt der Server; ob dieser Benutzer
+ * sie anstoßen darf, sagt das Recht. Vorher stand hier die rohe Serverliste:
+ * Ein Mitarbeiter ohne `buchungen.erfassen` scannte, drückte „Ausgeben" und
+ * wurde vom Wächter wortlos in die Geräteliste zurückgeworfen.
+ */
+const erlaubteAktionen = computed(() =>
+  ergebnis.value?.typ === "geraet" && darfBuchen.value ? ergebnis.value.aktionen : [],
+);
+
+/**
  * Sammelmodus — mehrere Geräte für EINE Buchung zusammentragen.
  *
  * Der Fall aus dem Bauhof: Zehn Geräte gehen auf dieselbe Baustelle. Einzeln
@@ -145,8 +172,11 @@ watch(eingabe, (wert) => {
 
 <template>
   <div class="scan">
-    <!-- ── Sammelmodus ────────────────────────────────────── -->
-    <div class="sammelleiste">
+    <!-- ── Sammelmodus ──────────────────────────────────────
+         Ohne `buchungen.erfassen` gar nicht erst anbieten: Sammeln ist der
+         Anlauf zu `/sammeln/:art`, und dort endet der Weg im stummen
+         Rückwurf — nach zehn gescannten Geräten. -->
+    <div v-if="darfBuchen" class="sammelleiste">
       <label class="sammelschalter">
         <input v-model="sammelmodus" type="checkbox" class="sammelschalter__feld" />
         <span class="sammelschalter__text">Mehrere sammeln</span>
@@ -288,7 +318,7 @@ watch(eingabe, (wert) => {
 
           <div class="karte__aktionen">
             <button
-              v-for="a in ergebnis.aktionen"
+              v-for="a in erlaubteAktionen"
               :key="a.art"
               class="pt-btn pt-btn--breit"
               :class="a.hauptaktion ? 'pt-btn--primaer pt-btn--gross' : ''"
@@ -360,7 +390,11 @@ watch(eingabe, (wert) => {
           <p class="karte__satz">{{ ergebnis.hinweis }}</p>
           <div class="karte__aktionen">
             <button
-              v-if="ergebnis.anlegbar && ergebnis.grund === 'geraet_nicht_erfasst'"
+              v-if="
+                ergebnis.anlegbar &&
+                ergebnis.grund === 'geraet_nicht_erfasst' &&
+                darfNach('/geraete/neu')
+              "
               class="pt-btn pt-btn--primaer pt-btn--breit pt-btn--gross"
               @click="router.push(`/geraete/neu?nummer=${encodeURIComponent(ergebnis.code)}`)"
             >
@@ -377,7 +411,7 @@ watch(eingabe, (wert) => {
     </div>
 
     <!-- ── Gesammelte Geräte ──────────────────────────────── -->
-    <section v-if="gesammelt.length" class="sammlung">
+    <section v-if="gesammelt.length && darfBuchen" class="sammlung">
       <h2 class="pt-mikro sammlung__titel">
         {{ gesammelt.length }} Gerät{{ gesammelt.length === 1 ? "" : "e" }} gesammelt
       </h2>

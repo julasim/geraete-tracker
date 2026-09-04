@@ -43,3 +43,19 @@ export function dauer(tage: number): string {
   if (tage === 1) return "seit gestern";
   return `seit ${tage} Tagen`;
 }
+
+/**
+ * Dieselbe Dauer, so kurz wie eine Tabellenspalte.
+ *
+ * Die Spalte „Seit" misst 76 px; `dauer()` liefert „seit 21 Tagen" und würde
+ * darin abgeschnitten. Die Überschrift trägt das „Seit" bereits, also trägt
+ * die Zelle nur den Rest — die volle Formulierung hängt als Titel daran.
+ *
+ * Steht hier und nicht in der Tabelle, weil sie zu `dauer()` gehört: Wer die
+ * eine Formulierung ändert, muss die andere sehen.
+ */
+export function kurzeDauer(tage: number): string {
+  if (tage <= 0) return "heute";
+  if (tage === 1) return "1 Tag";
+  return `${tage} Tage`;
+}

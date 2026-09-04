@@ -5,14 +5,26 @@
  * Standort und Person sind vorbelegt (zuletzt gewählt), aber änderbar.
  * Serienausgabe ist der Normalfall beim Bestücken eines Transporters,
  * deshalb führt die Bestätigung direkt zurück zum Scanner.
+ *
+ * Die Fachlichkeit steht seit AP25 in Composables, die sich diese Ansicht mit
+ * `BuchenDialog`, `SammelBuchenView` und `SammelPanel` teilt. `buchen()`
+ * selbst bleibt eigen: Der Ausgang dieser Ansicht ist eine eigene
+ * Bestätigungsseite mit „Nächstes Gerät scannen", und der ist an keiner der
+ * drei anderen Stellen derselbe.
  */
-import { computed, nextTick, onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { api, ApiError } from "@/api";
+import { api } from "@/api";
+import { meldeDefekt, sendeEinzelbuchung, sendeSammelbuchung, type Buchungsangaben } from "@/buchen";
+import { meldungAus } from "@/meldung";
 import { useAnmeldung } from "@/stores/anmeldung";
 import { useBestand } from "@/stores/bestand";
-import { useFoto } from "@/composables/useFoto";
-import type { Buchungsart, Geraet, PaketGeraet, Standort } from "@/typen";
+import { useBuchungsziel } from "@/composables/useBuchungsziel";
+import { useEmpfaenger } from "@/composables/useEmpfaenger";
+import { useNeueBaustelle } from "@/composables/useNeueBaustelle";
+import { useZubehoerwahl } from "@/composables/useZubehoerwahl";
+import { useZustandsfoto } from "@/composables/useZustandsfoto";
+import type { Buchungsart, Geraet } from "@/typen";
 import Kopf from "@/components/Kopf.vue";
 import StatusChip from "@/components/StatusChip.vue";
 import Symbol from "@/components/Symbol.vue";
@@ -26,164 +38,15 @@ const geraetId = route.params.id as string;
 const art = route.params.art as Buchungsart;
 
 const geraet = ref<Geraet | null>(null);
-/** Nur das Nötigste: die Liste kommt ohne Verwaltungsrecht abgespeckt. */
-const personen = ref<{ id: string; anzeigename: string }[]>([]);
 const laedt = ref(true);
 const speichert = ref(false);
 const fehler = ref<string | null>(null);
 const fertig = ref(false);
 
-const standortId = ref("");
-const lagerplatzId = ref("");
-
-/**
- * Eine Baustelle anlegen, ohne den Buchungsvorgang zu verlassen.
- *
- * Der Fall aus der Praxis: Ein Auftrag ist neu, das Gerät steht schon auf dem
- * Hänger, und die Baustelle gibt es im System noch nicht. Wer dafür in die
- * Verwaltung wechseln müsste, bucht am Ende gar nicht oder auf den falschen
- * Ort — und dann stimmt der Bestand nicht mehr, was in dieser Anwendung der
- * teuerste Fehler überhaupt ist.
- *
- * Nur mit dem Recht `stammdaten.pflegen`; wer es nicht hat, sieht die
- * Auswahl wie bisher.
- */
-/**
- * Das Zubehör des Geräts — die Löffel zum Bagger.
- *
- * Vorangehakt, weil es der Regelfall ist: Wer den Bagger ausgibt, lädt die
- * Löffel mit auf. Ohne diesen Vorschlag stünden sie im System weiter im
- * Lager, und der Bestand wäre falsch. Manchmal bleibt der Löffel aber da —
- * deshalb abwählbar, nicht erzwungen.
- *
- * Hat ein Gerät kein Zubehör, ändert sich an dieser Ansicht nichts.
- */
-const zubehoer = ref<PaketGeraet[]>([]);
-const zubehoerGewaehlt = ref<string[]>([]);
-
-async function zubehoerLaden(): Promise<void> {
-  try {
-    const liste = await api.get<PaketGeraet[]>(`/geraete/${geraetId}/zubehoer`);
-    zubehoer.value = liste;
-    zubehoerGewaehlt.value = liste.map((z) => z.id);
-  } catch {
-    // Ohne Zubehörliste bleibt die Ansicht wie bisher — buchen muss gehen.
-    zubehoer.value = [];
-  }
-}
-
-function zubehoerUmschalten(id: string): void {
-  const i = zubehoerGewaehlt.value.indexOf(id);
-  if (i >= 0) zubehoerGewaehlt.value.splice(i, 1);
-  else zubehoerGewaehlt.value.push(id);
-}
-
-/**
- * Ein Foto vom Zustand bei der Übergabe.
- *
- * Der Fall, für den es gedacht ist: Ein Gerät kommt beschädigt zurück, und
- * niemand kann belegen, wie es hinausging — bei Fremdfirmen der klassische
- * Streitpunkt. Das Bild hängt an der BUCHUNG, nicht am Gerät: Es
- * dokumentiert einen Zeitpunkt, keinen Dauerzustand.
- *
- * Freiwillig. Wer im Regen am Hänger steht, soll nicht fotografieren müssen.
- */
-const foto = useFoto();
-const fotoDatei = ref<File | null>(null);
-const fotoVorschau = ref<string | null>(null);
-const fotoWarnung = ref<string | null>(null);
-
-async function fotoWaehlen(ereignis: Event): Promise<void> {
-  const roh = (ereignis.target as HTMLInputElement).files?.[0];
-  if (!roh) return;
-  try {
-    const fertig = await foto.vorbereiten(roh);
-    fotoDatei.value = fertig.datei;
-    fotoVorschau.value = fertig.vorschau;
-    fotoWarnung.value = null;
-  } catch {
-    fotoWarnung.value = "Das Bild konnte nicht vorbereitet werden.";
-  }
-}
-
-function fotoVerwerfen(): void {
-  fotoDatei.value = null;
-  fotoVorschau.value = null;
-}
-
-async function fotoHochladen(buchungId: string): Promise<void> {
-  const formular = new FormData();
-  formular.append("datei", fotoDatei.value!);
-  formular.append("buchung_id", buchungId);
-  try {
-    const antwort = await fetch(`/api/geraete/${geraetId}/dateien`, {
-      method: "POST",
-      body: formular,
-      credentials: "same-origin",
-    });
-    if (!antwort.ok) throw new Error();
-  } catch {
-    // Die Buchung steht bereits — das darf sie nicht mehr umwerfen.
-    fotoWarnung.value =
-      "Die Buchung ist gespeichert, das Foto konnte nicht übertragen werden.";
-  }
-}
-
-const neuerOrtOffen = ref(false);
-const neuerOrtName = ref("");
-const neuerOrtLaeuft = ref(false);
-const neuerOrtFehler = ref<string | null>(null);
-const neuerOrtEl = ref<HTMLInputElement | null>(null);
-
-const darfOrteAnlegen = computed(() => anmeldung.darf("stammdaten.pflegen"));
-
-/** Warnt vor Dubletten, bevor gespeichert wird (siehe OrteView). */
-const aehnlicherOrt = computed(() => {
-  const eingabe = neuerOrtName.value.trim().toLowerCase();
-  if (eingabe.length < 3) return null;
-  return (
-    bestand.standorte.find((s) => {
-      const name = s.name.toLowerCase();
-      return name === eingabe || name.includes(eingabe) || eingabe.includes(name);
-    }) ?? null
-  );
-});
-
-async function neuerOrtZeigen(): Promise<void> {
-  neuerOrtOffen.value = true;
-  neuerOrtFehler.value = null;
-  await nextTick();
-  neuerOrtEl.value?.focus();
-}
-
-async function neuenOrtAnlegen(): Promise<void> {
-  const name = neuerOrtName.value.trim();
-  if (neuerOrtLaeuft.value || !name) return;
-  neuerOrtLaeuft.value = true;
-  neuerOrtFehler.value = null;
-
-  try {
-    const neu = await api.post<Standort>("/standorte", { name, typ: "baustelle" });
-    bestand.ergaenzeStandort(neu);
-    // Direkt auswählen: Genau dorthin wollte der Benutzer ja buchen.
-    standortId.value = neu.id;
-    neuerOrtOffen.value = false;
-    neuerOrtName.value = "";
-  } catch (e) {
-    neuerOrtFehler.value =
-      e instanceof ApiError
-        ? e.message
-        : "Die Baustelle konnte nicht angelegt werden. Bitte noch einmal versuchen.";
-  } finally {
-    neuerOrtLaeuft.value = false;
-  }
-}
-const empfaengerId = ref("");
-const empfaengerFrei = ref("");
-const fremdfirma = ref(false);
 const rueckgabe = ref("");
 const notiz = ref("");
 const ausfall = ref(false);
+const defektWarnung = ref<string | null>(null);
 
 const TITEL: Record<string, string> = {
   ausgabe: "Ausgeben",
@@ -192,107 +55,152 @@ const TITEL: Record<string, string> = {
 };
 
 const istRuecknahme = computed(() => art === "ruecknahme");
-const zielOrte = computed(() =>
-  istRuecknahme.value ? bestand.lager : bestand.aktiveStandorte.filter((s) => s.typ !== "lager"),
-);
-const plaetze = computed(() =>
-  standortId.value ? bestand.plaetzeAmStandort(standortId.value) : [],
+
+/**
+ * Der Ausfall-Schalter meldet seit AP25 einen SCHADEN, keine gesperrte
+ * Buchung (siehe `buchen.ts`). Deshalb hängt er am Recht `schaeden.melden` —
+ * wer es nicht hat, soll den Schalter gar nicht erst sehen statt ihn zu
+ * setzen und danach eine Fehlermeldung zu bekommen, die nichts mehr ändert.
+ * Die mitgelieferte Rolle „Mitarbeiter" hat das Recht.
+ */
+const darfSchadenMelden = computed(() => anmeldung.darf("schaeden.melden"));
+
+const { standortId, lagerplatzId, zielOrte, plaetze, merke } = useBuchungsziel(() => art);
+
+const {
+  personen,
+  empfaengerId,
+  empfaengerFrei,
+  fremdfirma,
+  empfaengerFelder,
+  laden: empfaengerLaden,
+} = useEmpfaenger();
+
+/** Bleibt hier: Ein Ref, den nur `ref="…"` liest, gilt sonst als ungelesen. */
+const neuerOrtEl = ref<HTMLInputElement | null>(null);
+
+const {
+  offen: neuerOrtOffen,
+  name: neuerOrtName,
+  laeuft: neuerOrtLaeuft,
+  fehler: neuerOrtFehler,
+  darfAnlegen: darfOrteAnlegen,
+  aehnlich: aehnlicherOrt,
+  zeigen: neuerOrtZeigen,
+  schliessen: neuerOrtSchliessen,
+  anlegen: neuenOrtAnlegen,
+} = useNeueBaustelle(standortId, () => neuerOrtEl.value?.focus());
+
+// Eine einelementige Liste: Beim Einzelvorgang ist das Gerät die ganze
+// „Sammlung". Damit gilt hier dieselbe Regel wie am Sammelweg — auch die
+// Entdopplung, die verhindert, dass ein Gerät sich selbst als Zubehör
+// anbietet.
+const {
+  zubehoer,
+  gewaehlt: zubehoerGewaehlt,
+  istGewaehlt,
+  umschalten: zubehoerUmschalten,
+  laden: zubehoerLaden,
+} = useZubehoerwahl(
+  () => [geraetId],
+  () => art,
 );
 
-const LETZTER_ORT = "gt-letzter-ort";
+const {
+  foto,
+  datei: fotoDatei,
+  vorschau: fotoVorschau,
+  warnung: fotoWarnung,
+  darfHochladen: darfFotoHochladen,
+  waehlen: fotoWaehlen,
+  verwerfen: fotoVerwerfen,
+  hochladen: fotoHochladen,
+} = useZustandsfoto(() => geraetId);
 
 onMounted(async () => {
   try {
     await bestand.laden();
     geraet.value = await api.get<Geraet>(`/geraete/${geraetId}`);
-    await zubehoerLaden();
-
-    // Jeder darf die Namensliste sehen — sonst ließe sich nichts auf jemanden
-    // buchen. Ohne das Recht "benutzer.verwalten" liefert die Route nur
-    // Kennung, Name und Zustand, keine E-Mail und keine Rolle.
-    personen.value = await api.get<{ id: string; anzeigename: string }[]>("/benutzer");
-
-    empfaengerId.value = anmeldung.benutzer?.id ?? "";
-
-    const gemerkt = localStorage.getItem(`${LETZTER_ORT}-${art}`);
-    const passt = zielOrte.value.some((s) => s.id === gemerkt);
-    standortId.value = passt && gemerkt ? gemerkt : (zielOrte.value[0]?.id ?? "");
   } catch (f) {
-    fehler.value = f instanceof Error ? f.message : "Konnte nicht laden";
+    fehler.value = meldungAus(f, "Konnte nicht laden");
   } finally {
     laedt.value = false;
   }
+
+  // Beide fangen ihre Fehler selbst ab: Ohne Zubehörliste bleibt die Ansicht
+  // wie eine ohne Zubehör, und der Weg „Fremdfirma ohne Konto" braucht gar
+  // keine Namensliste. Eine ausgefallene Nebenroute darf das Formular nicht
+  // kosten.
+  await Promise.all([zubehoerLaden(), empfaengerLaden()]);
 });
+
+/**
+ * Den Defekt nachtragen, nachdem die Rücknahme steht.
+ *
+ * Scheitert das, bleibt die Buchung gültig — sie ist die Hauptsache. Der
+ * Benutzer erfährt es aber, sonst hielte er das Gerät für gesperrt.
+ */
+async function defektNachtragen(buchungId: string | null): Promise<void> {
+  try {
+    const antwort = await meldeDefekt(geraetId, buchungId, notiz.value);
+    bestand.ersetze(antwort.geraet);
+    geraet.value = antwort.geraet;
+  } catch {
+    defektWarnung.value =
+      "Die Buchung ist gespeichert, der Defekt konnte nicht gemeldet werden. " +
+      "Bitte den Schaden am Gerät nachtragen.";
+  }
+}
 
 async function buchen(): Promise<void> {
   if (speichert.value) return;
   speichert.value = true;
   fehler.value = null;
+
+  const angaben: Buchungsangaben = {
+    art,
+    standortId: standortId.value,
+    lagerplatzId: lagerplatzId.value,
+    empfaenger: empfaengerFelder.value,
+    rueckgabe: rueckgabe.value,
+    notiz: notiz.value,
+  };
+
   try {
-    /**
-     * Geht Zubehör mit, ist es fachlich eine Sammelbuchung — dieselbe
-     * Transaktion, dieselbe Alles-oder-nichts-Regel. Sonst könnte der Bagger
-     * draußen stehen und der Löffel laut System im Lager, weil ein zweiter
-     * Aufruf scheiterte.
-     */
+    let eigene: { id: string } | null = null;
+
     if (zubehoerGewaehlt.value.length) {
-      const sammel = await api.post<{
-        geraete: Geraet[];
-        buchungen: { id: string; geraet_id: string }[];
-      }>(
-        "/buchungen/sammel",
-        {
-          geraet_ids: [geraetId, ...zubehoerGewaehlt.value],
-          art,
-          nach_standort_id: standortId.value || null,
-          nach_lagerplatz_id: lagerplatzId.value || null,
-          empfaenger_id: fremdfirma.value ? null : empfaengerId.value || null,
-          empfaenger_freitext: fremdfirma.value ? empfaengerFrei.value : null,
-          geplante_rueckgabe: rueckgabe.value || null,
-          notiz: notiz.value || null,
-        },
-      );
+      const sammel = await sendeSammelbuchung([geraetId, ...zubehoerGewaehlt.value], angaben);
       for (const g of sammel.geraete) bestand.ersetze(g);
       const eigenes = sammel.geraete.find((g) => g.id === geraetId);
       if (eigenes) geraet.value = eigenes;
-      localStorage.setItem(`${LETZTER_ORT}-${art}`, standortId.value);
 
       // Die Buchung DIESES Geräts heraussuchen, nicht die erste: Der Server
       // sortiert nach Id, das Foto hinge sonst womöglich am Löffel statt am
-      // Bagger.
-      const eigeneBuchung = sammel.buchungen.find((b) => b.geraet_id === geraetId);
-      if (fotoDatei.value && eigeneBuchung?.id) await fotoHochladen(eigeneBuchung.id);
-      fertig.value = true;
-      return;
+      // Bagger. Fehlt sie in der Antwort, wird hier still übersprungen —
+      // anders als im Dialog, der wirft. Beides ist vertretbar: Hier steht
+      // die Bestätigungsseite unmittelbar bevor, dort bleibt der Dialog
+      // stehen und kann die Warnung noch zeigen.
+      eigene = sammel.buchungen.find((b) => b.geraet_id === geraetId) ?? null;
+    } else {
+      const antwort = await sendeEinzelbuchung(geraetId, angaben);
+      bestand.ersetze(antwort.geraet);
+      geraet.value = antwort.geraet;
+      eigene = antwort.buchung;
     }
 
-    const antwort = await api.post<{ geraet: Geraet; buchung: { id: string } }>("/buchungen", {
-      geraet_id: geraetId,
-      art,
-      nach_standort_id: standortId.value || null,
-      nach_lagerplatz_id: lagerplatzId.value || null,
-      empfaenger_id: fremdfirma.value ? null : empfaengerId.value || null,
-      empfaenger_freitext: fremdfirma.value ? empfaengerFrei.value : null,
-      geplante_rueckgabe: rueckgabe.value || null,
-      notiz: notiz.value || null,
-      ausfall: istRuecknahme.value ? ausfall.value : undefined,
-    });
-
-    bestand.ersetze(antwort.geraet);
-    geraet.value = antwort.geraet;
-    localStorage.setItem(`${LETZTER_ORT}-${art}`, standortId.value);
+    merke();
 
     // Das Foto NACH der Buchung: Es hängt an ihr, also muss sie zuerst
     // existieren. Scheitert der Upload, ist die Buchung trotzdem gültig —
-    // ein Bild ist eine Beigabe, der Bestand ist die Hauptsache. Deshalb
-    // gibt es hier eine eigene Meldung statt eines Abbruchs.
-    if (fotoDatei.value && antwort.buchung?.id) {
-      await fotoHochladen(antwort.buchung.id);
-    }
+    // ein Bild ist eine Beigabe, der Bestand ist die Hauptsache.
+    if (fotoDatei.value && eigene?.id) await fotoHochladen(eigene.id);
+
+    if (istRuecknahme.value && ausfall.value) await defektNachtragen(eigene?.id ?? null);
+
     fertig.value = true;
   } catch (f) {
-    fehler.value =
-      f instanceof ApiError ? f.message : f instanceof Error ? f.message : "Buchung fehlgeschlagen";
+    fehler.value = meldungAus(f, "Buchung fehlgeschlagen");
   } finally {
     speichert.value = false;
   }
@@ -335,6 +243,9 @@ async function buchen(): Promise<void> {
           -->
           <p v-if="fotoWarnung" class="pt-meldung pt-meldung--warnung fertig__warnung">
             {{ fotoWarnung }}
+          </p>
+          <p v-if="defektWarnung" class="pt-meldung pt-meldung--warnung fertig__warnung">
+            {{ defektWarnung }}
           </p>
         </div>
 
@@ -402,11 +313,7 @@ async function buchen(): Promise<void> {
                 {{ neuerOrtFehler }}
               </p>
               <div class="neuer-ort__knoepfe">
-                <button
-                  type="button"
-                  class="pt-btn pt-btn--still"
-                  @click="neuerOrtOffen = false"
-                >
+                <button type="button" class="pt-btn pt-btn--still" @click="neuerOrtSchliessen">
                   Abbrechen
                 </button>
                 <button
@@ -438,11 +345,15 @@ async function buchen(): Promise<void> {
             <select v-if="!fremdfirma" id="person" v-model="empfaengerId" class="pt-feld">
               <option v-for="p in personen" :key="p.id" :value="p.id">{{ p.anzeigename }}</option>
             </select>
+            <!-- 120 Zeichen wie der Server (`empfaenger_freitext`): Ohne die
+                 Grenze tippt man einen Satz und bekommt erst beim Absenden
+                 eine Fehlermeldung. -->
             <input
               v-else
               v-model="empfaengerFrei"
               class="pt-feld"
               type="text"
+              maxlength="120"
               placeholder="z. B. Fa. Huber, Hr. Mayer"
             />
             <button class="pt-btn pt-btn--still umschalter" @click="fremdfirma = !fremdfirma">
@@ -456,14 +367,15 @@ async function buchen(): Promise<void> {
           </div>
         </template>
 
-        <div v-else class="feldgruppe">
-          <!-- Ein Ausfallschaden nimmt das Gerät sofort aus dem Umlauf.
-               Deshalb steht der Schalter hier und nicht in einem Untermenü. -->
+        <!-- Ein Ausfallschaden nimmt das Gerät sofort aus dem Umlauf. Deshalb
+             steht der Schalter hier und nicht in einem Untermenü. Er braucht
+             `schaeden.melden`, weil daraus eine Schadensmeldung wird. -->
+        <div v-else-if="darfSchadenMelden" class="feldgruppe">
           <label class="schalter">
             <input v-model="ausfall" type="checkbox" />
             <span>
               <strong>Gerät ist defekt</strong>
-              <small>Es wird gesperrt und lässt sich nicht mehr ausgeben.</small>
+              <small>Es wird als Schaden erfasst und lässt sich nicht mehr ausgeben.</small>
             </span>
           </label>
         </div>
@@ -480,7 +392,7 @@ async function buchen(): Promise<void> {
                 <input
                   type="checkbox"
                   class="haken__feld"
-                  :checked="zubehoerGewaehlt.includes(z.id)"
+                  :checked="istGewaehlt(z.id)"
                   @change="zubehoerUmschalten(z.id)"
                 />
                 <span>
@@ -495,14 +407,26 @@ async function buchen(): Promise<void> {
 
         <div class="feldgruppe">
           <label class="pt-label" for="notiz">Notiz (freiwillig)</label>
-          <input id="notiz" v-model="notiz" class="pt-feld" type="text" placeholder="Kurzer Vermerk" />
+          <!-- 2000 Zeichen wie der Server (`notiz`). -->
+          <input
+            id="notiz"
+            v-model="notiz"
+            class="pt-feld"
+            type="text"
+            maxlength="2000"
+            placeholder="Kurzer Vermerk"
+          />
         </div>
 
         <!--
           Zustandsfoto: freiwillig, deshalb unauffällig. capture="environment"
           öffnet am Handy direkt die Rückkamera statt der Dateiauswahl.
+
+          Nur mit `dateien.hochladen`: Ohne das Recht ginge die Buchung durch
+          und das Bild scheiterte — der Benutzer hätte im Regen umsonst
+          fotografiert, ohne je den Grund zu erfahren.
         -->
-        <div class="feldgruppe fotogruppe">
+        <div v-if="darfFotoHochladen" class="feldgruppe fotogruppe">
           <span class="pt-label">Zustand festhalten (freiwillig)</span>
 
           <div v-if="fotoVorschau" class="foto">

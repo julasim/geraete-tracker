@@ -143,7 +143,14 @@
   /* ── Maße ──────────────────────────────────────────────── */
   --tippziel: 48px; /* Mindestgröße für alles Antippbare */
   --leiste-hoehe: 60px; /* untere Navigationsleiste */
-  --kopf-hoehe: 52px;
+  --kopf-hoehe: 52px; /* Kopfzeile am Handy */
+  /*
+   * Kopfzeile am Computer. Steht hier und nicht nur in TopLeiste.vue, weil
+   * jede Ansicht mit getrennt scrollenden Spalten daraus ihre Resthöhe
+   * rechnet (calc(100dvh - var(--topleiste-hoehe))). Als feste 56 in sieben
+   * Ansichten liefe die Oberfläche beim ersten Ändern auseinander.
+   */
+  --topleiste-hoehe: 56px;
   --container: 780px;
 }
 

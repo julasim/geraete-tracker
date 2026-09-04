@@ -26,7 +26,7 @@ wsl -d Ubuntu-24.04 -- docker start tracker-db   # Datenbank hoch
 npm run db:migrate                                # Schema aktuell halten
 npm run benutzer:anlegen -- --name <name> --rolle verwaltung
 npm run build && node dist/index.js               # läuft auf :3000
-npm test                                          # 357 Tests
+npm test                                          # 391 Tests
 node scripts/rauchtest.mjs <name> <passwort>      # Anmeldung, gegen die laufende App
 node scripts/durchlauf.mjs <name> <passwort>      # Büro-Weg: anlegen, etikettieren
 node scripts/durchlauf-buchen.mjs <name> <pw>     # Baustellen-Weg: scannen, buchen
@@ -1115,6 +1115,286 @@ beide Typprüfungen und die Oberflächenprüfung grün.
 „ist"), kein Zubehör von Zubehör (eine Ebene, wie das Datenmodell), keine
 Teilbuchung.
 
+## AP24 — Die Oberfläche am Computer (2026-09-01)
+
+Bis hierher war der Geräte-Tracker eine Handy-Anwendung, die man am
+Schreibtisch auch aufmachen konnte: 780 px Inhalt in der Mitte, vier Reiter
+unten, eine Kartenliste, in der 290 Geräte niemand vergleicht. Ein
+Design-Handoff (Hi-Fi, 425 Zeilen, neun Ansichten) hat daraus eine zweite
+Haltung gemacht.
+
+**Zwei Haltungen, ein Umbruchpunkt.** Unter 1024 px bleibt alles, wie es
+war — auf der Baustelle wird einhändig bedient, teils mit Handschuhen. Ab
+1024 px: Seitenleiste links, dichte Tabelle, Dialoge über der Liste. **Keine
+Zwischenstufe.** Ein iPad quer bekommt die breite Haltung, ein iPad hochkant
+die schmale. Zwei Haltungen sind begreifbar, drei nicht.
+
+Die Grenze steht an **einer** Stelle: `web/src/composables/useBreite.ts`.
+Sie lag anfangs in `AppShell.vue`; als sieben Ansichten dieselbe Frage
+stellten, wären das sieben Beobachter auf derselben Medienabfrage gewesen —
+sieben Gelegenheiten, den Wert auseinanderlaufen zu lassen. `tablet` ist
+dabei **keine dritte Haltung**, sondern eine Abtönung der breiten: dasselbe
+Gerüst, aber Tippziele von 44 px und eine Kartenliste statt der Tabelle.
+Mit dem Finger trifft niemand eine 48 px hohe Tabellenzeile mit einem 18 px
+großen Kästchen darin.
+
+**Gebaut wurde je Ansicht von einem eigenen Agenten**, sieben parallel im
+selben Arbeitsverzeichnis. Damit das ohne Kollisionen geht, mussten die
+gemeinsamen Teile **vorher** stehen (`useBreite`, `TopLeiste.vue`, fünf
+Symbole) und jede Ansicht ihre Dateien exklusiv besitzen. Zwei Bauteile
+gehören in fremde Dateien — der Buchen-Dialog und die iPad-Kartenliste —,
+sie wurden freistehend gebaut und danach zentral eingehängt. Tabelle und
+Kartenliste teilen sich dafür einen **vorab festgelegten Vertrag** (drei
+Props, vier Ereignisse), sodass `GeraeteView` sie nur gegeneinander tauscht.
+
+**Die Mehrfachauswahl ist der Sammelmodus des Scanners.** Sie liegt in
+`bestand.sammlung`, genau wie am Handy. Eine zweite Auswahl hätte bedeutet,
+dass die Sammelbuchung zwei Wege hat — und zwei Wege in eine Buchung sind
+zwei Gelegenheiten, den Bestand falsch zu machen.
+
+### Was nur der Browser gezeigt hat
+
+**Bei geöffnetem Sammelpanel verschwand die Spalte „Bezeichnung".** Von
+1440 px bleiben mit Seitenleiste (240) und Panel (400) rund 710 px für die
+Tabelle; ihre sieben Spalten brauchen aber schon 752 px an festen Breiten
+und Abständen. Die Bezeichnungsspalte ist die einzige flexible — sie
+schrumpfte auf **null**, ausgerechnet der Gerätename war weg, und der Rest
+ragte quer heraus. Behoben mit einer **Container-Abfrage**, nicht mit einer
+Medienabfrage: Wie breit die Tabelle ist, hängt nicht am Fenster, sondern
+daran, ob das Panel offen ist. Wird es eng, fallen „Person / Platz" und
+„Seit" weg — beim Bestücken sieht man auf Nummer, Bezeichnung, Zustand und
+Ort; wer und seit wann steht auf der Gerätekarte.
+
+Dazu: Der Ausgabeknopf schrieb **„1 Geräte ausgeben"**, während der Titel
+darüber die Einzahl richtig hatte.
+
+### Drei Tests, die sich bei der Gegenprobe als Attrappe erwiesen
+
+*Merksatz aus AP12 und AP23, in dieser Runde dreimal bestätigt: Eine
+Gegenprobe, die grün bleibt, ist ein Befund über den Test.*
+
+1. **„Leere Werte ans Ende sortieren"** — das geprüfte Gerät stand ohnehin
+   als letztes in der Eingabe und blieb nur wegen der Stabilität von `sort`
+   unten.
+2. **„Trenner am Zeilenanfang weglassen"** — alle Vorlagen hatten eine
+   Inventarnummer, der Fall konnte gar nicht eintreten. Er ist real: Bei
+   jeder Ersterfassung gibt es Geräte ohne Nummer.
+3. **„Fokus springt zurück in die Bezeichnung"** — der Fokus lag schon dort
+   und nahm ihn niemand weg.
+
+Ein `try/catch` ist ausdrücklich als **ungeprüft** ausgewiesen statt als
+getestet verkauft: Ohne den Block bleiben alle Tests grün, weil vitest die
+unbehandelte Zusage hier nicht meldet.
+
+### Befunde, die über die Oberfläche hinausgehen
+
+- **`POST /geraete` nimmt beim Anlegen keinen Lagerplatz entgegen.** Der
+  Entwurf verlangt das Paar Ort/Lagerplatz; `neuSchema` kennt nur
+  `standort_id`, ein mitgeschicktes `lagerplatz_id` würde Zod
+  **stillschweigend verwerfen**. Statt eines toten Feldes steht dort jetzt
+  „Wo steht es?" allein. Offen.
+- **Am Handy erscheinen Buchungsknöpfe ohne `buchungen.erfassen`** und
+  „Schaden melden" ohne `schaeden.bearbeiten`; der Etiketten-Knopf in der
+  Erfassung ebenso ohne `etiketten.drucken`. Der Server weist mit 403 ab —
+  kein Loch, aber Knöpfe, die für diesen Benutzer nie funktionieren. Am
+  Computer sind sie korrekt geschützt. Offen.
+- **Das Prüfskript sieht nur statische `class="…"`.** Klassen aus
+  `:class`-Bindungen prüft es nicht — eine Lücke im Werkzeug.
+- Ein toter Ternär in der Handy-Fußleiste der Etiketten
+  (`Bogen{{ boegen === 1 ? "" : "" }}`) hat die Mehrzahl seit jeher
+  verschluckt. Behoben.
+
+### Aufgeräumt
+
+Vier Dopplungen, die die Agenten benannt statt verschwiegen haben:
+`useOffeneAusgaben()` (Tabelle und Kartenliste holten `GET /buchungen/offen`
+mit demselben Block), `kurzeDauer()` neben `dauer()` in `format.ts`, der
+Speicherschlüssel für den zuletzt gewählten Ort (`merken.ts` — er lag
+**viermal** als Literal herum, dass alle vier denselben Wert ergaben, war
+Glück) und das Maß der Kopfzeile als `--topleiste-hoehe`.
+
+**Offen geblieben:** `useBuchung.ts` / `useSammelbuchung.ts`. Der
+Buchen-Dialog wiederholt rund 200 Zeilen Fachlichkeit aus `BuchenView.vue`,
+das Sammelpanel rund 90 aus `SammelBuchenView.vue`. Das ist eine eigene
+Runde mit eigener Absicherung wert, keine Nebenbei-Änderung an vier
+getesteten Dateien.
+
+**Im Browser abgenommen** bei 1440×900, 1024×768 und 390×844: Seitenleiste
+mit Zähler, Übersicht, Tabelle mit Sortierung und Mehrfachauswahl,
+Sammelpanel, Orte, Etiketten, Erfassung, Gerätedetail. **Eine echte Buchung
+durchgespielt** — Dialog, „Gebucht.", Zustandswechsel, vierter Eintrag im
+Verlauf — und mit einer Rücknahme auf Regal A1 wieder zurückgestellt.
+Tippziele am iPad nachgemessen: Navigationseintrag 44, Abmelden 44,
+Suchknopf 44, Auswahlkästchen 18 px in einer 44×44-Hülle.
+
+**Stand: 513 Tests** (377 Server, 136 Oberfläche), 23 Schutzregeln, ESLint,
+beide Typprüfungen, die Oberflächenprüfung und der Bau grün.
+
+## AP25 — Die drei offenen Punkte aus AP24 (2026-09-02)
+
+Am Ende von AP24 standen drei Punkte zur Entscheidung. Alle drei sind
+erledigt — und die Analyse davor hat an jedem etwas gefunden, das größer war
+als der Punkt selbst.
+
+### 1. Lagerplatz beim Anlegen
+
+Der Befund stimmte: `neuSchema` kannte nur `standort_id`, ein mitgeschicktes
+`lagerplatz_id` verwarf Zod **stillschweigend**, und der INSERT schrieb die
+Spalte gar nicht.
+
+**Die Annahme dazu war falsch.** Vermutet war, der Lagerplatz müsse über eine
+Eingangsbuchung laufen, weil „Standort ergibt sich ausschließlich aus
+Buchungen". Tatsächlich setzt das Anlegen den Standort seit jeher direkt — und
+`src/data/geraete.ts` sagt das im Funktionskommentar ausdrücklich („setzt den
+Anfangsstandort"). Beim Anlegen gibt es keinen Vorzustand, von dem etwas
+abweichen könnte; die Kette bleibt geschlossen, weil `bucheInTx` den gesetzten
+Ort als `von_standort_id` der ersten echten Buchung übernimmt. Es fehlt kein
+Glied, nur das nullte. Eine Eingangsbuchung hätte eine neue Buchungsart im
+Zustandsautomaten gekostet, ein zweites Recht für den Erfasser und eine
+Antwort auf den Import, der 200 Geräte ohne Ort anlegt — für einen Eintrag im
+Verlauf.
+
+**Die Regel „Platz gehört zum Ort" steht jetzt an einer Stelle**
+(`pruefePlatzZuStandortInTx` in `src/data/stammdaten.ts`), und dabei sind
+**zwei echte Bestandsfehler** aufgefallen, die dieselbe Regel betreffen:
+
+1. **Die Prüfung wurde übersprungen, sobald kein Zielstandort mitkam.** Eine
+   Rücknahme mit `nach_lagerplatz_id` ohne `nach_standort_id` ließ das Gerät
+   am alten Ort stehen und setzte trotzdem ein fremdes Regal — ein Gerät stand
+   laut Bestand auf einer Baustelle, in einem Regal, das im Bauhof steht. Ohne
+   Meldung. Geprüft wird jetzt gegen den **effektiven** Zielstandort
+   (`nach_standort_id ?? aktueller_standort_id`).
+2. **`korrigiere()` setzte den Lagerplatz beim Ortwechsel nicht zurück.**
+   Dasselbe Ergebnis, anderer Weg.
+
+Nebenwirkung, die man kennen muss: **`POST /geraete` mit unbekanntem Standort
+antwortet jetzt 404 statt 500.** Die neue Prüfung hält den
+Fremdschlüsselfehler von der Route fern. Ein `23503`-Zweig in `server.ts`
+wurde **bewusst nicht** ergänzt — er wirkte auf alle Routen und verwandelte
+laute Fehler in leise.
+
+### 2. Rechteprüfungen
+
+Aus drei Stellen wurden **neun plus eine falsche**, und die Notiz aus AP24 „am
+Computer korrekt geschützt" war widerlegt:
+
+- **„Schaden melden" prüfte am Computer das falsche Recht** —
+  `schaeden.bearbeiten` statt `schaeden.melden`. Die mitgelieferte Rolle
+  *Mitarbeiter* hat genau `schaeden.melden`: **Sie durfte melden und sah den
+  Knopf am Schreibtisch nicht.**
+- **„Ausmustern" erschien ohne `geraete.ausmustern`** — in beiden Haltungen.
+  Das trifft die Rolle *Lager und Werkstatt* im Normalbetrieb: bestätigen, und
+  dann passiert nichts.
+- Buchungsknöpfe und Sammelmodus in `ScanView` und im Handy-Zweig von
+  `GeraetView` ohne `buchungen.erfassen`; „Paket ausgeben" ohne dasselbe; das
+  Zustandsfoto ohne `dateien.hochladen`; `MehrView` mit einer
+  Abschnittsbedingung, die ihre eigenen Einträge nicht deckte (ein reiner
+  *Mitarbeiter* kam am Handy weder zu Paketen noch zu den Stammdaten).
+
+**Drei davon liefen nicht in einen 403, sondern in den Router** — und dessen
+Rückwurf ist **stumm**. Der Benutzer sammelt zehn Geräte, tippt auf „Ausgeben"
+und steht ohne ein Wort in der Geräteliste. Das ist schlimmer als ein 403, der
+wenigstens „Dafür fehlt die Berechtigung" sagt.
+
+**Der Server war sauber.** Alle schreibenden Routen tragen `darf(...)`; es gab
+kein Loch. Die Änderungen sind Bequemlichkeit, nicht Schutz.
+
+Statt dreißig einzelner `v-if` gibt es jetzt zwei Verallgemeinerungen:
+`erlaubteAktionen(status, darfBuchen)` filtert **im Server** (der Parameter hat
+**keinen Standardwert** — ein vergessener Aufrufer soll ein Typfehler sein,
+kein stilles `true`), und `web/src/rechte-pfade.ts` beantwortet „welches Recht
+verlangt dieser Zielpfad" an einer Stelle. `router.ts`, `SeitenLeiste` und
+`MehrView` lesen daraus.
+
+**„Bestand berichtigen" ist entfernt.** Der Knopf führte auf
+`/buchen/:id/korrektur`, dort ging ein `POST /buchungen` mit `art: "korrektur"`
+hinaus — und `buchungsSchema` kennt die Art nicht. Er hat **nie
+funktioniert**; das Prüfskript führt `POST /buchungen/korrektur` selbst als
+„bewusst nur über die Schnittstelle". Erst dadurch konnte `/buchen/:id/:art`
+ein `meta.recht` bekommen: Vorher bediente die Route zwei verschiedene Rechte.
+
+### 3. Die doppelte Buchungsfachlichkeit
+
+**Der ursprünglich vorgeschlagene Schnitt war der falsche.** `useBuchung` /
+`useSammelbuchung` folgt der Achse Einzel/Sammel — aber genau dort liegen die
+*Unterschiede* (Foto, Ausfall, neue Baustelle, Fehlerbehandlung). Die
+Dopplungen liegen quer dazu: Zubehör stand viermal, die Dublettenwarnung für
+Orte dreimal (auch in `OrteView`), die Fehlermeldungskette viermal.
+
+Geschnitten wurde deshalb **nach Thema**: `orte.ts`, `useZustandsfoto`,
+`useNeueBaustelle`, `useZubehoerwahl`, `useBuchungsziel`, `useEmpfaenger`,
+`buchen.ts`, `meldung.ts`. **`buchen()` bleibt bewusst vier Kopien** — vier
+Aufrufer mit vier verschiedenen Ausgängen ergäben einen Automaten, der
+schwerer zu lesen wäre.
+
+**Der Gewinn ist nicht die Zeilenzahl** (netto spart der Umbau kaum etwas),
+sondern dass die gefundenen Abweichungen nicht wiederkehren können. Das
+Musterbeispiel steht in AP24: Dort wurde die Mehrzahl („1 Geräte ausgeben") im
+Panel behoben — und die identische Stelle am Handy blieb stehen.
+
+**Fünf Fehler, die aus dem Auseinanderlaufen entstanden waren:**
+
+1. **Abgewähltes Zubehör hakte sich von selbst wieder an.** `zubehoerLaden()`
+   setzte die Auswahl bedingungslos auf alle zurück, und ein Watcher hing an
+   der Länge der Sammlung: Wer den Hydraulikhammer abwählte und danach ein
+   anderes Gerät entfernte, buchte den Hammer mit hinaus. Am Computer
+   wahrscheinlicher, weil die Tabelle danebensteht.
+2. `zubehoerGewaehlt` blieb in zwei Ausstiegszweigen stehen — Ids gingen an den
+   Server, die nirgends angezeigt wurden.
+3. Die Mehrzahl am Handy (siehe oben).
+4. `maxlength` fehlte bei Notiz und Freitext.
+5. `/benutzer` ohne `catch`: Fiel die Route aus, erschien das Formular gar
+   nicht — obwohl der Weg „Fremdfirma ohne Konto" keine Namensliste braucht.
+
+Dazu die vier fehlenden `watch`, die den Lagerplatz beim Ortwechsel leeren.
+
+**Der Defekt-Haken bei der Rücknahme mit Zubehör** wurde stillschweigend
+verworfen: Der Bagger kam kaputt zurück, stand auf `verfuegbar` und wurde am
+nächsten Morgen wieder ausgegeben. Das Weglassen war als *Schutz* richtig —
+`bucheMehrere` reicht den Rumpf unverändert an jedes Gerät weiter, ein
+`ausfall` hätte den Löffel mitgesperrt. Entschieden wurde: **Der Defekt wird
+als Schadensmeldung erfasst.** Das sperrt genauso, erzeugt aber einen
+Datensatz, den man normal erledigen kann — ein per Buchung gesperrtes Gerät
+bekommt sonst nur jemand mit `buchungen.korrigieren` wieder frei.
+**Der Preis steht im Kommentar von `meldeDefekt`:** Aus einer Transaktion
+wurden zwei Aufrufe, und dazwischen ist das Gerät kurz verfügbar.
+
+### Was die Nachprüfung an der eigenen Arbeit fand
+
+Vier Skeptiker haben jedes Paket am Code gegengelesen, nicht am Bericht.
+Ergebnis: ein „fertig", drei „mit Mängeln", alle behoben. Die drei, die
+zählen:
+
+- **Die Seitenleiste trug Pfad und Recht weiter doppelt**, während das
+  Handy-Gegenstück schon umgestellt war — und der Kommentar behauptete, sie
+  täte dasselbe.
+- **Ein Test behauptete eine Deckung, die es nicht gab:** Die Testvorlage des
+  Handy-Formulars führte eigens einen Ort ohne Regale mit und kommentierte ihn
+  als Beleg — geprüft wurde er nie. Eine Mutation, die den Wächter entfernte,
+  ließ alle sechzehn Prüfungen grün.
+- **`BUCHBAR` ist eine Handkopie von `ERLAUBT`**, und nichts hielt beide
+  zusammen. Jetzt tut es ein Test, wie `tests/domain-rechte.test.ts` es für die
+  Rechtelisten vormacht.
+
+Dazu eine Attrappe („trägt entweder Konto oder Freitext, nie beides" prüfte in
+Wahrheit nur den Durchreicher) und **sechs Dateien mit CRLF-Zeilenenden**, die
+die Bau-Agenten hinterlassen hatten — in diesem Projekt der fünfte Fall dieser
+Fehlerart nach BOM (AP14), CRLF (AP11), literalem CR (AP17) und einem
+Steuerzeichen (AP24).
+
+### Abgenommen
+
+Die ganze CI-Kette lokal (`pruefung.yml`, alle acht Schritte): **603 Tests**
+(391 Server, 212 Oberfläche), Lint, beide Typprüfungen, Oberflächenprüfung,
+Bau, Schemaprüfung.
+
+Im Browser gegen den laufenden Server, mit **drei echten Konten**: Gerät mit
+Ort **und** Regal angelegt (steht in der Datenbank mit beidem); Ortwechsel nach
+Platzwahl → Feld verschwindet; „Bestand berichtigen" erscheint auch mit
+`buchungen.korrigieren` nicht mehr; als *Mitarbeiter* **erscheint „Schaden
+melden" jetzt am Schreibtisch** und „Stammdaten bearbeiten" nicht; als *Lager
+und Werkstatt* ist „Ausmustern" weg — und mit dem Recht wieder da.
+
 ## Nächster Schritt
 
 **Kamera-Abnahme am echten Etikett** mit iPad und Android — braucht die
@@ -1124,12 +1404,45 @@ HTTPS-Adresse, steht also erst nach dem ersten Aufsetzen an. Protokoll:
 Danach: Bestand erfassen (Import oder einzeln), Etiketten für Geräte ohne
 Aufkleber drucken.
 
+**Die drei Entscheidungen aus AP24 sind erledigt** (siehe AP25). Offen
+geblieben ist, was dabei am Rand aufgefallen ist — nichts davon dringend:
+
+1. **`POST /geraete/:id/pruefungen` hat keine Bedienung.** Prüfarten lassen
+   sich anlegen, eine *durchgeführte* Prüfung kann niemand eintragen. Das
+   Recht `pruefungen.eintragen` ist damit zur Hälfte unbenutzbar, und die
+   Fristenliste aus AP15 füllt sich nie. Das Prüfskript meldet es nicht,
+   weil `wirdBedient()` Aufrufpfade am `${` abschneidet und
+   `/api/geraete/:id/pruefungen` dadurch mit `/api/geraete/:id/schaeden`
+   zusammenfällt.
+2. **Der Defekt-Weg ist nicht mehr transaktional.** Rücknahme und
+   Ausfallschaden sind zwei Aufrufe; dazwischen steht das Gerät kurz auf
+   `verfuegbar`. Wer das schließen will, braucht eine Serverroute, die
+   beides in einer Transaktion erledigt. Begründung im Kommentar von
+   `meldeDefekt` (`web/src/buchen.ts`).
+3. **`pruefePlatzZuStandortInTx` prüft `lagerplaetze.aktiv` nicht.** Ein
+   stillgelegtes Regal lässt sich über die API weiterhin zuweisen (über die
+   Oberfläche nicht — der Store filtert). War vorher schon so. Entweder
+   `aktiv` aufnehmen oder bewusst offenlassen — ein Gerät steht ja womöglich
+   wirklich noch dort.
+4. **`zubehoerVonMehreren()` in `src/data/pakete.ts` hat keinen Aufrufer.**
+   Sie holt das Zubehör mehrerer Geräte in einer Abfrage, inklusive der
+   Regel „ein Gerät, das selbst in der Liste steht, nicht doppelt anbieten" —
+   die `useZubehoerwahl` im Frontend nachbaut. Entweder bekommt sie eine
+   Route, oder sie gehört gelöscht.
+5. **Das Prüfskript sieht nur statische `class="…"`** und keine
+   `:class`-Bindungen; und es findet die Fehlerart „Knopf ohne Recht" gar
+   nicht. Eine Stufe darüber wäre baubar (Routen-Rechte-Tabelle gegen die
+   Ansichten), erwischt aber nur die halben Fälle, solange die
+   Pfad-Extraktion `${…}` abschneidet statt als Platzhalter zu behandeln.
+
 ## Konventionen
+
 
 - Deutsch in Doku, Kommentaren, UI und Commit-Messages; englische Bezeichner im Code,
   wo üblich. Fachbegriffe der Domäne (`geraete`, `buchungen`, `standorte`) auf Deutsch.
 - Vor jedem Commit: `npx tsc --noEmit`, `npm run lint`, `npm test`, ab Frontend
-  zusätzlich `npm --prefix web run pruefe` (vue-tsc).
+  zusätzlich `npm --prefix web run pruefe` (vue-tsc), `npm run test:web` und
+  `npm run pruefe:oberflaeche`.
   *Nicht `npx vue-tsc`: Das zieht eine fremde Version aus dem Netz und meldet
   einen `baseUrl`-Fehler, den das Projekt mit seiner eigenen Fassung nicht hat.*
 - **Kein Push ohne ausdrückliche Aufforderung.** `.claude/` und `.env` nie committen.

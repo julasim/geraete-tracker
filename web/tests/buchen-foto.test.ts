@@ -12,6 +12,9 @@
  * 2. **Ein gescheiterter Upload darf die Buchung nicht umwerfen.** Der
  *    Bestand ist die Hauptsache, das Bild eine Beigabe. Wer im Funkloch
  *    steht, soll trotzdem gebucht haben.
+ * 3. **Ohne `dateien.hochladen` gibt es das Feld gar nicht.** Sonst geht die
+ *    Buchung durch und nur das Bild scheitert — mit einer Meldung, die den
+ *    Grund nicht nennt. Der Benutzer hat dann im Regen umsonst fotografiert.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -67,9 +70,9 @@ function fetchAntwort(ok: boolean) {
   return vi.fn().mockResolvedValue({ ok, json: async () => ({}) });
 }
 
-async function baue() {
+async function baue(rechte = ["buchungen.erfassen", "stammdaten.pflegen", "dateien.hochladen"]) {
   setActivePinia(createPinia());
-  useAnmeldung().rechte = ["buchungen.erfassen", "stammdaten.pflegen"];
+  useAnmeldung().rechte = rechte;
   const bestand = useBestand();
   bestand.standorte = [
     { id: "s1", name: "Baustelle Nord", typ: "baustelle", aktiv: true } as Standort,
@@ -106,6 +109,14 @@ describe("Zustandsfoto bei der Buchung", () => {
     const ansicht = await baue();
     expect(ansicht.text()).toContain("Zustand festhalten (freiwillig)");
     expect(ansicht.find('input[type="file"]').exists()).toBe(true);
+  });
+
+  it("zeigt das Feld ohne dateien.hochladen gar nicht erst", async () => {
+    const ansicht = await baue(["buchungen.erfassen"]);
+    expect(ansicht.text()).not.toContain("Zustand festhalten (freiwillig)");
+    expect(ansicht.find('input[type="file"]').exists()).toBe(false);
+    // Und der Hauptweg bleibt bedienbar: Das Feld war freiwillig.
+    expect(ansicht.findAll("button").some((b) => b.text() === "Ausgeben")).toBe(true);
   });
 
   it("bucht ohne Foto, ohne etwas hochzuladen", async () => {

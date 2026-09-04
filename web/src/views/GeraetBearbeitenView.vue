@@ -8,10 +8,16 @@
  * Der Konfliktschutz über `rev` greift beim Speichern: Hat jemand anderes
  * inzwischen gespeichert, kommt eine Meldung mit dem aktuellen Stand statt
  * eines stillen Überschreibens.
+ *
+ * **Die Ansicht verlangt `geraete.pflegen`, das Ausmustern ein zweites,
+ * folgenreicheres Recht.** Wer hier hereinkommt, darf also nicht
+ * zwangsläufig alles, was hier steht — die mitgelieferte Rolle „Lager und
+ * Werkstatt" ist genau dieser Fall.
  */
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { api, ApiError } from "@/api";
+import { useAnmeldung } from "@/stores/anmeldung";
 import { useBestand } from "@/stores/bestand";
 import type { Geraet } from "@/typen";
 import Kopf from "@/components/Kopf.vue";
@@ -19,8 +25,18 @@ import StatusChip from "@/components/StatusChip.vue";
 
 const route = useRoute();
 const router = useRouter();
+const anmeldung = useAnmeldung();
 const bestand = useBestand();
 const id = route.params.id as string;
+
+/**
+ * Ausmustern ist keine Stammdatenpflege.
+ *
+ * `POST /geraete/:id/ausmustern` verlangt `geraete.ausmustern` — bis AP25
+ * stand der Knopf ohne jede Prüfung da. „Lager und Werkstatt" bestätigte
+ * also „Gerät ausmustern?", und danach passierte nichts.
+ */
+const darfAusmustern = computed(() => anmeldung.darf("geraete.ausmustern"));
 
 const geraet = ref<Geraet | null>(null);
 const barcodes = ref<{ barcode: string; aktiv: boolean }[]>([]);
@@ -293,7 +309,7 @@ onMounted(laden);
         </section>
 
         <!-- ── Ausmustern ─────────────────────────────────── -->
-        <section>
+        <section v-if="darfAusmustern">
           <h2 class="pt-mikro abschnitt">Aus dem Bestand nehmen</h2>
           <div class="pt-karte ausmustern">
             <div>

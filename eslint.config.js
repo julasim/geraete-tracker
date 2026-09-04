@@ -94,6 +94,10 @@ export default tseslint.config(
         HTMLCanvasElement: "readonly",
         Event: "readonly",
         PopStateEvent: "readonly",
+        // Fehlte, solange keine Ansicht auf Tasten horchte. Der Buchen-Dialog
+        // tut es (Escape schließt, Tab bleibt im Dialog) — ohne den Eintrag
+        // meldet no-undef jede Typangabe KeyboardEvent in einer .vue-Datei.
+        KeyboardEvent: "readonly",
         AbortController: "readonly",
         requestAnimationFrame: "readonly",
         cancelAnimationFrame: "readonly",

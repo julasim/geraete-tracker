@@ -3,6 +3,7 @@
 import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import { api } from "@/api";
+import { darfNach } from "@/rechte-pfade";
 import { useAnmeldung } from "@/stores/anmeldung";
 import { useBestand } from "@/stores/bestand";
 import type { FaelligePruefung, OffeneAusgabe, SicherungsStand } from "@/typen";
@@ -22,6 +23,55 @@ const router = useRouter();
  * eine zweite Liste zu bauen, die dasselbe zeigt, wäre doppelte Pflege).
  */
 const SICHTBAR = 12;
+
+/**
+ * Der Abschnitt „Verwaltung" als Daten, nicht als sieben Zeilen Template.
+ *
+ * Vorher hing über der ganzen Liste ein `v-if="darf('geraete.pflegen') ||
+ * istVerwaltung"`, während die Einträge darin ganz andere Rechte verlangen.
+ * Zwei Folgen, beide falsch: Ein reiner Mitarbeiter sah den Abschnitt gar
+ * nicht und kam am Handy weder zu **Pakete** noch zu **Schlagworte und
+ * Prüfarten** — beides Ansichten, die er ausdrücklich sehen darf. Und wer
+ * `geraete.pflegen` hatte, sah Einträge, die ihm der Wächter wortlos
+ * verweigert.
+ *
+ * Gefiltert wird über den **Zielpfad** (`darfNach`), nicht über ein hier
+ * noch einmal hingeschriebenes Recht: So kann die Zeile nicht anderer
+ * Meinung sein als die Route, auf die sie führt. `components/SeitenLeiste.vue`
+ * tut dasselbe am Computer — beide lesen aus `rechte-pfade.ts`.
+ */
+interface Eintrag {
+  pfad: string;
+  titel: string;
+  unter: string;
+}
+
+const VERWALTUNG: Eintrag[] = [
+  {
+    pfad: "/geraete/neu",
+    titel: "Gerät anlegen",
+    unter: "einzeln erfassen, eines nach dem anderen",
+  },
+  {
+    pfad: "/austausch",
+    titel: "Import und Export",
+    unter: "Bestand als Tabelle aus- und einlesen",
+  },
+  { pfad: "/pakete", titel: "Pakete", unter: "Geräte, die immer gemeinsam hinausgehen" },
+  {
+    pfad: "/stammdaten",
+    titel: "Schlagworte und Prüfarten",
+    unter: "Einteilung des Bestands und wiederkehrende Fristen",
+  },
+  { pfad: "/etiketten", titel: "Etiketten drucken", unter: "Barcode-Etiketten für neue Geräte" },
+  {
+    pfad: "/benutzer",
+    titel: "Benutzer und Rollen",
+    unter: "Konten anlegen, Berechtigungen vergeben",
+  },
+];
+
+const verwaltung = computed(() => VERWALTUNG.filter((e) => darfNach(e.pfad)));
 
 const offene = ref<OffeneAusgabe[]>([]);
 const pruefungen = ref<FaelligePruefung[]>([]);
@@ -186,50 +236,20 @@ async function abmelden(): Promise<void> {
         </ul>
       </section>
 
-      <section v-if="anmeldung.darf('geraete.pflegen') || anmeldung.istVerwaltung">
+      <section v-if="verwaltung.length || sicherungText">
         <h2 class="pt-mikro abschnitt">Verwaltung</h2>
         <div class="pt-karte">
           <ul class="pt-liste">
-            <li v-if="anmeldung.darf('geraete.pflegen')">
-              <button class="pt-zeile" @click="router.push('/geraete/neu')">
+            <li v-for="e in verwaltung" :key="e.pfad">
+              <button class="pt-zeile" @click="router.push(e.pfad)">
                 <div class="pt-zeile__haupt">
-                  <div class="pt-zeile__titel">Gerät anlegen</div>
-                  <div class="pt-zeile__unter">einzeln erfassen, eines nach dem anderen</div>
+                  <div class="pt-zeile__titel">{{ e.titel }}</div>
+                  <div class="pt-zeile__unter">{{ e.unter }}</div>
                 </div>
               </button>
             </li>
-            <li v-if="anmeldung.darf('daten.austauschen')">
-              <button class="pt-zeile" @click="router.push('/austausch')">
-                <div class="pt-zeile__haupt">
-                  <div class="pt-zeile__titel">Import und Export</div>
-                  <div class="pt-zeile__unter">Bestand als Tabelle aus- und einlesen</div>
-                </div>
-              </button>
-            </li>
-            <li>
-              <button class="pt-zeile" @click="router.push('/pakete')">
-                <div class="pt-zeile__haupt">
-                  <div class="pt-zeile__titel">Pakete</div>
-                  <div class="pt-zeile__unter">Geräte, die immer gemeinsam hinausgehen</div>
-                </div>
-              </button>
-            </li>
-            <li>
-              <button class="pt-zeile" @click="router.push('/stammdaten')">
-                <div class="pt-zeile__haupt">
-                  <div class="pt-zeile__titel">Schlagworte und Prüfarten</div>
-                  <div class="pt-zeile__unter">Einteilung des Bestands und wiederkehrende Fristen</div>
-                </div>
-              </button>
-            </li>
-            <li v-if="anmeldung.darf('etiketten.drucken')">
-              <button class="pt-zeile" @click="router.push('/etiketten')">
-                <div class="pt-zeile__haupt">
-                  <div class="pt-zeile__titel">Etiketten drucken</div>
-                  <div class="pt-zeile__unter">Barcode-Etiketten für neue Geräte</div>
-                </div>
-              </button>
-            </li>
+            <!-- Kein Eintrag, sondern ein Zustand: Die Zeile führt nirgendwo
+                 hin und steht deshalb außerhalb der Liste oben. -->
             <li v-if="sicherungText">
               <div class="pt-zeile pt-zeile--still">
                 <div class="pt-zeile__haupt">
@@ -245,14 +265,6 @@ async function abmelden(): Promise<void> {
                   {{ sicherungText.text }}
                 </span>
               </div>
-            </li>
-            <li v-if="anmeldung.istVerwaltung">
-              <button class="pt-zeile" @click="router.push('/benutzer')">
-                <div class="pt-zeile__haupt">
-                  <div class="pt-zeile__titel">Benutzer und Rollen</div>
-                  <div class="pt-zeile__unter">Konten anlegen, Berechtigungen vergeben</div>
-                </div>
-              </button>
             </li>
           </ul>
         </div>

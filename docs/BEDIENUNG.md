@@ -5,6 +5,53 @@ Rollen vergeben.
 
 ---
 
+# Am Computer sieht alles anders aus
+
+Das ist Absicht. Die Anwendung kennt **zwei Haltungen**:
+
+- **Schmaler als 1024 Pixel** (Handy, iPad hochkant): eine Spalte,
+  Navigation unten, große Tippziele. Gebaut für eine Hand mit
+  Arbeitshandschuh.
+- **Ab 1024 Pixel** (Computer, iPad quer): eine schwarze Leiste links mit
+  allen Bereichen, daneben eine dichte Tabelle. Gebaut für Maus, Tastatur
+  und Vergleichen.
+
+Dieselben Daten, dieselben Regeln — nur die Dichte unterscheidet sich. Es
+gibt **keinen Umschalter**: Was Sie sehen, hängt allein an der Fensterbreite.
+Wer ein Fenster schmaler zieht, bekommt die Handy-Ansicht.
+
+**Scannen gibt es nur am Handy.** Die Kamera braucht eine gesicherte
+Verbindung und eine Hand am Etikett; am Schreibtisch steht deshalb nur ein
+Hinweis darauf.
+
+## Mehrere Geräte am Computer ausgeben
+
+In der Geräteliste hat jede Zeile links ein Kästchen. Sobald eines
+angehakt ist, klappt rechts die **Sammelausgabe** auf: Ziel, Person,
+geplante Rückgabe, Notiz — einmal für alle.
+
+Das Kästchen oben in der Kopfzeile wählt alle **sichtbaren** Zeilen. Sichtbar
+heißt: was Suche und Filter gerade übrig lassen — nicht der ganze Bestand.
+
+Diese Auswahl ist **dieselbe** wie der Sammelmodus des Scanners am Handy.
+Wer unterwegs sechs Geräte einscannt und sich dann an den Rechner setzt,
+findet sie dort wieder.
+
+> **Alles oder nichts.** Scheitert ein einziges Gerät — weil es defekt oder
+> schon ausgegeben ist — bucht der Server **keines**. Die Meldung nennt das
+> Gerät beim Namen; nehmen Sie es aus der Auswahl und buchen Sie erneut.
+
+## Ausgeben ohne Seitenwechsel
+
+Am Computer öffnet sich zum Buchen ein Fenster über der Liste, statt die
+Seite zu wechseln. Die Liste dahinter bleibt stehen; nach dem Buchen sind
+Sie wieder dort, wo Sie waren. **Escape** oder ein Klick daneben bricht ab.
+
+Am Handy bleibt es bei der eigenen Seite mit Bestätigung — dort ist für ein
+Fenster kein Platz.
+
+---
+
 # Was ist fällig?
 
 **Mehr → Prüfungen stehen an → Alle Fristen ansehen** (oder direkt

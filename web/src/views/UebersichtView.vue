@@ -22,6 +22,7 @@ import { useAnmeldung } from "@/stores/anmeldung";
 import { useBestand } from "@/stores/bestand";
 import type { FaelligePruefung, OffeneAusgabe, SicherungsStand } from "@/typen";
 import Symbol from "@/components/Symbol.vue";
+import TopLeiste from "@/components/TopLeiste.vue";
 
 const bestand = useBestand();
 const anmeldung = useAnmeldung();
@@ -76,12 +77,7 @@ const sicherungsText = computed(() => {
 
 <template>
   <div>
-    <header class="topbar">
-      <div>
-        <h1 class="topbar__titel">Übersicht</h1>
-        <p class="topbar__unter">{{ anmeldung.benutzer?.anzeigename }}</p>
-      </div>
-    </header>
+    <TopLeiste titel="Übersicht" :unter="anmeldung.benutzer?.anzeigename" />
 
     <div class="inhalt">
       <!-- ── Kennzahlen ──────────────────────────────────────── -->
@@ -202,26 +198,6 @@ const sicherungsText = computed(() => {
 </template>
 
 <style scoped>
-.topbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  height: 56px;
-  padding: 0 var(--space-6);
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-}
-.topbar__titel {
-  font-size: var(--fs-20);
-  font-weight: var(--fw-semibold);
-  letter-spacing: -0.015em;
-  color: var(--fg);
-}
-.topbar__unter {
-  font-size: var(--fs-13);
-  color: var(--fg-muted);
-}
-
 .inhalt {
   padding: var(--space-6);
   display: flex;
@@ -312,8 +288,7 @@ const sicherungsText = computed(() => {
   .spalten {
     grid-template-columns: 1fr;
   }
-  .inhalt,
-  .topbar {
+  .inhalt {
     padding-left: var(--space-4);
     padding-right: var(--space-4);
   }

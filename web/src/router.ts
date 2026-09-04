@@ -1,10 +1,17 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { useAnmeldung } from "@/stores/anmeldung";
+import { rechtFuer } from "@/rechte-pfade";
 
 /**
  * Ansichten werden nachgeladen. Der Scanner zieht das WebAssembly-Paket
  * nach sich (rund 1 MB) — das soll nicht beim ersten Öffnen der
  * Anmeldeseite über die Mobilfunkverbindung gehen.
+ *
+ * **Welche Route welches Recht verlangt, steht nicht hier**, sondern in
+ * `@/rechte-pfade`. Dieselbe Karte beantwortet die Frage für Knöpfe, die auf
+ * eine Ansicht führen — stünde das Recht an beiden Stellen als Literal,
+ * liefen sie irgendwann auseinander, und der Benutzer landete über einen
+ * sichtbaren Knopf im stummen Rückwurf des Wächters.
  */
 export const router = createRouter({
   history: createWebHistory(),
@@ -27,14 +34,12 @@ export const router = createRouter({
       path: "/geraete/neu",
       name: "geraet-neu",
       component: () => import("@/views/GeraetNeuView.vue"),
-      meta: { recht: "geraete.pflegen" },
     },
     { path: "/geraete/:id", name: "geraet", component: () => import("@/views/GeraetView.vue") },
     {
       path: "/geraete/:id/bearbeiten",
       name: "geraet-bearbeiten",
       component: () => import("@/views/GeraetBearbeitenView.vue"),
-      meta: { recht: "geraete.pflegen" },
     },
     {
       // Sammelbuchung: Die Geräte stehen im Store, nicht im Pfad — eine
@@ -43,15 +48,19 @@ export const router = createRouter({
       path: "/sammeln/:art",
       name: "sammeln",
       component: () => import("@/views/SammelBuchenView.vue"),
-      meta: { recht: "buchungen.erfassen" },
     },
     {
+      // Verlangt `buchungen.erfassen` wie die Schwesterroute `/sammeln/:art`.
+      // Sie war bis AP25 die einzige ungeschützte Buchungsroute. Gefahrlos
+      // ist das erst, seit der Server `korrektur` nicht mehr als Aktion
+      // anbietet: Diese Art hätte `buchungen.korrigieren` verlangt (und lief
+      // ohnehin in einen 400, weil `buchungsSchema` sie nicht kennt).
       path: "/buchen/:id/:art",
       name: "buchen",
       component: () => import("@/views/BuchenView.vue"),
     },
     { path: "/orte", name: "orte", component: () => import("@/views/OrteView.vue") },
-    // Ohne meta.recht: Lesen ist in dieser Anwendung kein Recht — wer
+    // Nicht in rechte-pfade.ts: Lesen ist in dieser Anwendung kein Recht — wer
     // angemeldet ist, darf sehen, was ansteht.
     {
       path: "/pruefungen",
@@ -63,7 +72,6 @@ export const router = createRouter({
       path: "/etiketten",
       name: "etiketten",
       component: () => import("@/views/EtikettenView.vue"),
-      meta: { recht: "etiketten.drucken" },
     },
     {
       // Die Startseite am Computer. Am Handy übernimmt "Mehr" dieselbe
@@ -74,14 +82,14 @@ export const router = createRouter({
       component: () => import("@/views/UebersichtView.vue"),
     },
     {
-      // Ohne meta.recht: Wer ein Paket ausgeben will, muss sehen, was drin
+      // Nicht in rechte-pfade.ts: Wer ein Paket ausgeben will, muss sehen, was drin
       // ist. Die Knöpfe zum Ändern erscheinen nur mit stammdaten.pflegen.
       path: "/pakete",
       name: "pakete",
       component: () => import("@/views/PaketeView.vue"),
     },
     {
-      // Ohne meta.recht: Die Ansicht zeigt Schlagworte und Prüfarten, und
+      // Nicht in rechte-pfade.ts: Die Ansicht zeigt Schlagworte und Prüfarten, und
       // Lesen ist in dieser Anwendung kein Recht. Die Knöpfe zum Ändern
       // erscheinen nur mit stammdaten.pflegen bzw. pruefungen.eintragen —
       // der Server weist es ohnehin ab.
@@ -93,31 +101,26 @@ export const router = createRouter({
       path: "/austausch",
       name: "austausch",
       component: () => import("@/views/AustauschView.vue"),
-      meta: { recht: "daten.austauschen" },
     },
     {
       path: "/benutzer",
       name: "benutzer",
       component: () => import("@/views/BenutzerView.vue"),
-      meta: { recht: "benutzer.verwalten" },
     },
     {
       path: "/benutzer/neu",
       name: "benutzer-neu",
       component: () => import("@/views/BenutzerBearbeitenView.vue"),
-      meta: { recht: "benutzer.verwalten" },
     },
     {
       path: "/benutzer/:id",
       name: "benutzer-bearbeiten",
       component: () => import("@/views/BenutzerBearbeitenView.vue"),
-      meta: { recht: "benutzer.verwalten" },
     },
     {
       path: "/rollen",
       name: "rollen",
       component: () => import("@/views/RollenView.vue"),
-      meta: { recht: "benutzer.verwalten" },
     },
     { path: "/passwort", name: "passwort", component: () => import("@/views/PasswortView.vue") },
     { path: "/:pfad(.*)*", redirect: "/scan" },
@@ -154,7 +157,11 @@ router.beforeEach(async (zu) => {
   // Ansichten, für die das Recht fehlt, gar nicht erst öffnen. Das ist
   // Bequemlichkeit, kein Schutz — der sitzt im Server, der jede dieser
   // Routen ohnehin mit 403 abweist.
-  const verlangt = zu.meta.recht as string | undefined;
+  //
+  // Der Rückwurf ist stumm. Das wiegt schwerer als ein 403 (der trägt
+  // wenigstens „Dafür fehlt die Berechtigung: …“), und genau deshalb prüfen
+  // die Knöpfe, die hierher führen, dieselbe Karte über `darfNach()`.
+  const verlangt = rechtFuer(zu.path);
   if (verlangt && !anmeldung.darf(verlangt)) {
     return { path: "/geraete" };
   }

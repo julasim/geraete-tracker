@@ -14,6 +14,7 @@
 import { computed, nextTick, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { api, ApiError } from "@/api";
+import { darfNach } from "@/rechte-pfade";
 import { useAnmeldung } from "@/stores/anmeldung";
 import { useBestand } from "@/stores/bestand";
 import type { Paket, PaketGeraet } from "@/typen";
@@ -26,6 +27,16 @@ const bestand = useBestand();
 const anmeldung = useAnmeldung();
 
 const darfPflegen = computed(() => anmeldung.darf("stammdaten.pflegen"));
+
+/**
+ * Darf dieser Benutzer ein Paket ausgeben?
+ *
+ * Das Ausgeben füllt die Sammlung und führt nach `/sammeln/ausgabe` — ohne
+ * `buchungen.erfassen` wirft der Wächter dort wortlos zurück, und der
+ * Benutzer steht mit einer unerklärlich befüllten Auswahl in der
+ * Geräteliste. Gefragt wird deshalb der Zielpfad, nicht das Recht.
+ */
+const darfAusgeben = computed(() => darfNach("/sammeln/ausgabe"));
 
 const pakete = ref<Paket[]>([]);
 const laedt = ref(true);
@@ -243,7 +254,18 @@ onMounted(async () => {
             </ul>
           </div>
 
-          <div class="knopfzeile knopfzeile--breit">
+          <!--
+            Der Modifikator verteilt die Knöpfe auf beide Ränder. Das ergibt
+            nur Sinn, wenn wirklich zwei stehen — wer bloß ausgeben darf (die
+            mitgelieferte Rolle „Mitarbeiter"), sähe seinen einzigen Knopf
+            sonst links kleben, während er im ganzen Rest der Anwendung rechts
+            steht.
+          -->
+          <div
+            v-if="darfPflegen || darfAusgeben"
+            class="knopfzeile"
+            :class="{ 'knopfzeile--breit': darfPflegen && darfAusgeben }"
+          >
             <button
               v-if="darfPflegen"
               class="pt-btn pt-btn--still"
@@ -252,6 +274,7 @@ onMounted(async () => {
               Paket löschen
             </button>
             <button
+              v-if="darfAusgeben"
               class="pt-btn pt-btn--primaer"
               :disabled="!inhalt[p.id]?.length"
               @click="ausgeben(p.id)"

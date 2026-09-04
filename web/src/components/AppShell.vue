@@ -18,9 +18,10 @@
  * wenn sie unsichtbar wäre — sonst führen Tastatur und Vorlesehilfe durch
  * eine doppelte Navigation.
  */
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { api } from "@/api";
+import { useBreite } from "@/composables/useBreite";
 import { useAnmeldung } from "@/stores/anmeldung";
 import type { FaelligePruefung } from "@/typen";
 import SeitenLeiste from "./SeitenLeiste.vue";
@@ -40,20 +41,18 @@ const istAktiv = (pfad: string) => route.path === pfad || route.path.startsWith(
 // Der Sucher soll den ganzen Schirm bekommen.
 const ohneRahmen = computed(() => route.meta.ohneRahmen === true);
 
-/** Die Grenze steht an EINER Stelle — CSS und JavaScript teilen sie sich. */
-const BREIT_AB = "(min-width: 1024px)";
-const breit = ref(false);
-let abfrage: MediaQueryList | null = null;
-const merken = (e: MediaQueryListEvent | MediaQueryList) => (breit.value = e.matches);
+/*
+ * Die Grenze steht an EINER Stelle: composables/useBreite.ts. Sie lag hier,
+ * bis die sieben Computer-Ansichten dieselbe Frage stellten — sieben eigene
+ * Beobachter auf derselben Medienabfrage wären sieben Gelegenheiten, den
+ * Wert auseinanderlaufen zu lassen.
+ */
+const { breit } = useBreite();
 
 /** Überfällige Prüfungen — der Zähler an der Seitenleiste. */
 const faellig = ref(0);
 
 onMounted(async () => {
-  abfrage = window.matchMedia(BREIT_AB);
-  merken(abfrage);
-  abfrage.addEventListener("change", merken);
-
   try {
     const liste = await api.get<FaelligePruefung[]>("/pruefungen/faellig");
     faellig.value = liste.filter((p) => p.ampel === "ueberfaellig").length;
@@ -62,8 +61,6 @@ onMounted(async () => {
     // eine erfundene Zahl.
   }
 });
-
-onBeforeUnmount(() => abfrage?.removeEventListener("change", merken));
 </script>
 
 <template>

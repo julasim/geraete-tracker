@@ -17,6 +17,8 @@
  */
 import { computed } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
+import { useBreite } from "@/composables/useBreite";
+import { darfNach } from "@/rechte-pfade";
 import { useAnmeldung } from "@/stores/anmeldung";
 import Symbol from "./Symbol.vue";
 import type { SymbolName } from "./symbole";
@@ -24,6 +26,14 @@ import type { SymbolName } from "./symbole";
 const route = useRoute();
 const router = useRouter();
 const anmeldung = useAnmeldung();
+/*
+ * Am iPad wachsen die Einträge von 36 auf 44 px. Die Abfrage kommt aus dem
+ * Composable und nicht als zweite Medienabfrage ins CSS — genau dafür ist
+ * es da. Nötig ist es, weil die neun Einträge nur 2 px Abstand haben: Mit
+ * dem Finger landet man sonst auf dem Nachbarn, und das ist der Weg zu
+ * jeder anderen Ansicht.
+ */
+const { tablet } = useBreite();
 
 const props = defineProps<{
   /** Wie viele Prüfungen sind überfällig? Erscheint als Zähler am Eintrag. */
@@ -32,12 +42,19 @@ const props = defineProps<{
   firma?: string;
 }>();
 
+/*
+ * Ein Eintrag trägt seinen Pfad, nicht sein Recht.
+ *
+ * Bis zu dieser Runde stand beides nebeneinander — Pfad und Recht als zwei
+ * Literale je Zeile. Sie stimmten überein, aber nur zufällig: Ändert sich das
+ * Recht einer Route, laufen sie auseinander, und kein Test bemerkt es. Welches
+ * Recht ein Ziel verlangt, steht jetzt an genau einer Stelle
+ * (`rechte-pfade.ts`), und Handy („Mehr") wie Computer lesen daraus.
+ */
 interface Eintrag {
   pfad: string;
   text: string;
   symbol: SymbolName;
-  /** Ohne Angabe: für jeden sichtbar — Lesen ist in dieser Anwendung kein Recht. */
-  recht?: string;
   zaehler?: boolean;
 }
 
@@ -55,20 +72,10 @@ const GRUPPEN: { titel: string; eintraege: Eintrag[] }[] = [
   {
     titel: "Verwaltung",
     eintraege: [
-      { pfad: "/etiketten", text: "Etiketten", symbol: "etikett", recht: "etiketten.drucken" },
-      {
-        pfad: "/austausch",
-        text: "Import und Export",
-        symbol: "austausch",
-        recht: "daten.austauschen",
-      },
+      { pfad: "/etiketten", text: "Etiketten", symbol: "etikett" },
+      { pfad: "/austausch", text: "Import und Export", symbol: "austausch" },
       { pfad: "/stammdaten", text: "Schlagworte und Prüfarten", symbol: "einstellungen" },
-      {
-        pfad: "/benutzer",
-        text: "Benutzer und Rollen",
-        symbol: "benutzer",
-        recht: "benutzer.verwalten",
-      },
+      { pfad: "/benutzer", text: "Benutzer und Rollen", symbol: "benutzer" },
     ],
   },
 ];
@@ -76,7 +83,7 @@ const GRUPPEN: { titel: string; eintraege: Eintrag[] }[] = [
 const gruppen = computed(() =>
   GRUPPEN.map((g) => ({
     ...g,
-    eintraege: g.eintraege.filter((e) => !e.recht || anmeldung.darf(e.recht)),
+    eintraege: g.eintraege.filter((e) => darfNach(e.pfad)),
   })).filter((g) => g.eintraege.length),
 );
 
@@ -102,7 +109,7 @@ async function abmelden(): Promise<void> {
 </script>
 
 <template>
-  <aside class="seitenleiste" aria-label="Hauptnavigation">
+  <aside class="seitenleiste" :class="{ 'seitenleiste--tablet': tablet }" aria-label="Hauptnavigation">
     <div class="seitenleiste__kopf">
       <span class="seitenleiste__zeichen"><Symbol name="scan" :groesse="20" /></span>
       <div class="seitenleiste__marke">
@@ -173,7 +180,7 @@ async function abmelden(): Promise<void> {
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 56px;
+  height: var(--topleiste-hoehe);
   flex: none;
   padding: 0 var(--space-4);
   border-bottom: 1px solid #1d1d20;
@@ -257,6 +264,20 @@ async function abmelden(): Promise<void> {
   opacity: 0.8;
   flex: none;
 }
+/*
+ * 44 px mit dem Finger. Der Platz ist da: Neun Einträge zu 44 px plus
+ * Gruppenlabels brauchen rund 502 px, dazu Kopf und Fuß — auf einem iPad
+ * quer (768 px hoch) bleibt Luft.
+ */
+.seitenleiste--tablet .eintrag {
+  height: 44px;
+}
+/* Das kleinste Ziel der ganzen Oberfläche — und es meldet ab. */
+.seitenleiste--tablet .fuss__abmelden {
+  width: 44px;
+  height: 44px;
+}
+
 .eintrag__zaehler {
   font-size: var(--fs-11);
   font-weight: var(--fw-semibold);

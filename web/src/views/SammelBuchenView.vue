@@ -17,10 +17,13 @@
  */
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { api, ApiError } from "@/api";
-import { useAnmeldung } from "@/stores/anmeldung";
+import { sendeSammelbuchung, type Buchungsangaben } from "@/buchen";
+import { meldungAus } from "@/meldung";
 import { useBestand } from "@/stores/bestand";
-import type { Buchungsart, Geraet, PaketGeraet, Standort } from "@/typen";
+import { useBuchungsziel } from "@/composables/useBuchungsziel";
+import { useEmpfaenger } from "@/composables/useEmpfaenger";
+import { useZubehoerwahl } from "@/composables/useZubehoerwahl";
+import type { Buchungsart, Geraet, Standort } from "@/typen";
 import Kopf from "@/components/Kopf.vue";
 import StatusChip from "@/components/StatusChip.vue";
 import Symbol from "@/components/Symbol.vue";
@@ -28,19 +31,10 @@ import Symbol from "@/components/Symbol.vue";
 const route = useRoute();
 const router = useRouter();
 const bestand = useBestand();
-const anmeldung = useAnmeldung();
 
 const art = route.params.art as Buchungsart;
 const istRuecknahme = computed(() => art === "ruecknahme");
 
-const LETZTER_ORT = "gt-letzter-ort";
-
-const personen = ref<{ id: string; anzeigename: string }[]>([]);
-const standortId = ref("");
-const lagerplatzId = ref("");
-const empfaengerId = ref("");
-const empfaengerFrei = ref("");
-const fremdfirma = ref(false);
 const rueckgabe = ref("");
 const notiz = ref("");
 
@@ -51,73 +45,47 @@ const gebucht = ref(0);
 
 const geraete = computed(() => bestand.gesammelteGeraete as Geraet[]);
 
-const zielOrte = computed(() =>
-  istRuecknahme.value ? bestand.lager : bestand.aktiveStandorte.filter((s) => s.typ !== "lager"),
+const { standortId, lagerplatzId, zielOrte, plaetze, merke } = useBuchungsziel(() => art);
+
+const {
+  personen,
+  empfaengerId,
+  empfaengerFrei,
+  fremdfirma,
+  empfaengerFelder,
+  laden: empfaengerLaden,
+} = useEmpfaenger({
+  // Bei einer Rücknahme gibt es kein Empfängerfeld — dann braucht es die
+  // Namensliste auch nicht. Diese Bedingung stand hier schon vor AP25 und
+  // darf beim Zusammenführen nicht stillschweigend verschwinden.
+  wenn: () => !istRuecknahme.value,
+  // Der Rückfall auf den ersten Namen stammt aus AP23 und bleibt auf die
+  // Sammelwege beschränkt: `empfaenger_id` landet in einer unveränderlichen
+  // Zeile, ein fremder Name darin ist nur per Gegenbuchung zu berichtigen.
+  ersterAlsRueckfall: true,
+});
+
+const {
+  zubehoer,
+  gewaehlt: zubehoerGewaehlt,
+  istGewaehlt,
+  umschalten: zubehoerUmschalten,
+  laden: zubehoerLaden,
+} = useZubehoerwahl(
+  () => bestand.sammlung,
+  () => art,
 );
-const plaetze = computed(() =>
-  standortId.value ? bestand.plaetzeAmStandort(standortId.value) : [],
-);
-
-// ── Zubehör ────────────────────────────────────────────────────────────────
-
-const zubehoer = ref<PaketGeraet[]>([]);
-const zubehoerGewaehlt = ref<string[]>([]);
-
-async function zubehoerLaden(): Promise<void> {
-  const ids = bestand.sammlung;
-  if (!ids.length) {
-    zubehoer.value = [];
-    return;
-  }
-  try {
-    // Je Gerät einzeln: Es sind wenige Aufrufe, sie laufen parallel, und die
-    // Route gibt es bereits. Eine Sammelroute dafür wäre mehr Schnittstelle
-    // als Gewinn.
-    const listen = await Promise.all(
-      ids.map((id) => api.get<PaketGeraet[]>(`/geraete/${id}/zubehoer`).catch(() => [])),
-    );
-    // Was selbst schon gesammelt ist, nicht doppelt anbieten.
-    const gesehen = new Set(ids);
-    const flach: PaketGeraet[] = [];
-    for (const z of listen.flat()) {
-      if (gesehen.has(z.id)) continue;
-      gesehen.add(z.id);
-      flach.push(z);
-    }
-    zubehoer.value = flach;
-    // Vorangehakt: Der Regelfall ist, dass das Zubehör mitfährt.
-    zubehoerGewaehlt.value = flach.map((z) => z.id);
-  } catch {
-    zubehoer.value = [];
-  }
-}
-
-function zubehoerUmschalten(id: string): void {
-  const i = zubehoerGewaehlt.value.indexOf(id);
-  if (i >= 0) zubehoerGewaehlt.value.splice(i, 1);
-  else zubehoerGewaehlt.value.push(id);
-}
 
 const anzahlGesamt = computed(() => geraete.value.length + zubehoerGewaehlt.value.length);
 
 onMounted(async () => {
   await bestand.laden();
-  const gemerkt = localStorage.getItem(`${LETZTER_ORT}-${art}`);
-  const passt = gemerkt && zielOrte.value.some((s) => s.id === gemerkt);
-  standortId.value = passt && gemerkt ? gemerkt : (zielOrte.value[0]?.id ?? "");
-
-  if (!istRuecknahme.value) {
-    try {
-      personen.value = await api.get<{ id: string; anzeigename: string }[]>("/benutzer");
-      empfaengerId.value = anmeldung.benutzer?.id ?? personen.value[0]?.id ?? "";
-    } catch {
-      // Ohne Personenliste bleibt der Freitext — buchen muss trotzdem gehen.
-    }
-  }
-  await zubehoerLaden();
+  await Promise.all([empfaengerLaden(), zubehoerLaden()]);
 });
 
-// Wird ein Gerät aus der Liste genommen, ändert sich auch sein Zubehör.
+// Wird ein Gerät aus der Liste genommen, ändert sich auch sein Zubehör. Die
+// ausdrücklich abgewählten Teile überstehen das seit AP25 (siehe
+// `useZubehoerwahl`) — vorher hakte sich der abgewählte Hammer hier wieder an.
 watch(() => bestand.sammlung.length, zubehoerLaden);
 
 async function buchen(): Promise<void> {
@@ -125,21 +93,23 @@ async function buchen(): Promise<void> {
   speichert.value = true;
   fehler.value = null;
 
-  const alle = [...bestand.sammlung, ...zubehoerGewaehlt.value];
+  const angaben: Buchungsangaben = {
+    art,
+    standortId: standortId.value,
+    lagerplatzId: lagerplatzId.value,
+    empfaenger: empfaengerFelder.value,
+    rueckgabe: rueckgabe.value,
+    notiz: notiz.value,
+  };
+
   try {
-    const antwort = await api.post<{ geraete: Geraet[] }>("/buchungen/sammel", {
-      geraet_ids: alle,
-      art,
-      nach_standort_id: standortId.value || null,
-      nach_lagerplatz_id: lagerplatzId.value || null,
-      empfaenger_id: fremdfirma.value ? null : empfaengerId.value || null,
-      empfaenger_freitext: fremdfirma.value ? empfaengerFrei.value : null,
-      geplante_rueckgabe: rueckgabe.value || null,
-      notiz: notiz.value || null,
-    });
+    const antwort = await sendeSammelbuchung(
+      [...bestand.sammlung, ...zubehoerGewaehlt.value],
+      angaben,
+    );
 
     for (const g of antwort.geraete) bestand.ersetze(g);
-    localStorage.setItem(`${LETZTER_ORT}-${art}`, standortId.value);
+    merke();
     gebucht.value = antwort.geraete.length;
     bestand.sammlungLeeren();
     fertig.value = true;
@@ -147,8 +117,7 @@ async function buchen(): Promise<void> {
     // Der Server nennt das Gerät beim Namen ("Rüttelplatte (10011): …").
     // Genau diese Meldung gehört hierher, damit klar ist, welches Gerät aus
     // der Liste muss.
-    fehler.value =
-      f instanceof ApiError ? f.message : f instanceof Error ? f.message : "Buchung fehlgeschlagen";
+    fehler.value = meldungAus(f, "Buchung fehlgeschlagen");
   } finally {
     speichert.value = false;
   }
@@ -180,7 +149,13 @@ function ortAlsText(s: Standort): string {
     <template v-if="fertig">
       <div class="fertig">
         <div class="fertig__haken"><Symbol name="haken" :groesse="40" /></div>
-        <h2 class="fertig__titel">{{ gebucht }} Geräte gebucht</h2>
+        <!--
+          Die Mehrzahl wird gebeugt. Das ist keine Kosmetik, sondern das
+          Musterbeispiel dieser Runde: In `SammelPanel` wurde genau dieser
+          Fehler bei AP24 behoben — und die wortgleiche Stelle am Handy blieb
+          stehen, weil niemand wusste, dass es sie ein zweites Mal gibt.
+        -->
+        <h2 class="fertig__titel">{{ gebucht }} Gerät{{ gebucht === 1 ? "" : "e" }} gebucht</h2>
         <p class="fertig__satz">
           {{ art === "ausgabe" ? "Ausgegeben" : art === "ruecknahme" ? "Zurückgenommen" : "Umgebucht" }}
         </p>
@@ -233,7 +208,7 @@ function ortAlsText(s: Standort): string {
                 <input
                   type="checkbox"
                   class="haken__feld"
-                  :checked="zubehoerGewaehlt.includes(z.id)"
+                  :checked="istGewaehlt(z.id)"
                   @change="zubehoerUmschalten(z.id)"
                 />
                 <span>
@@ -291,7 +266,14 @@ function ortAlsText(s: Standort): string {
 
         <div class="feldgruppe">
           <label class="pt-label" for="notiz">Notiz (freiwillig)</label>
-          <input id="notiz" v-model="notiz" class="pt-feld" placeholder="Gilt für alle Geräte" />
+          <!-- 2000 Zeichen wie der Server (`notiz`). -->
+          <input
+            id="notiz"
+            v-model="notiz"
+            class="pt-feld"
+            maxlength="2000"
+            placeholder="Gilt für alle Geräte"
+          />
         </div>
 
         <div class="knoepfe">
@@ -300,7 +282,11 @@ function ortAlsText(s: Standort): string {
             :disabled="speichert"
             @click="buchen"
           >
-            {{ speichert ? "Wird gebucht …" : `${anzahlGesamt} Geräte buchen` }}
+            {{
+              speichert
+                ? "Wird gebucht …"
+                : `${anzahlGesamt} Gerät${anzahlGesamt === 1 ? "" : "e"} buchen`
+            }}
           </button>
           <button class="pt-btn pt-btn--breit" @click="router.push('/scan')">Abbrechen</button>
         </div>

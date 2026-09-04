@@ -24,4 +24,10 @@ export type SymbolName =
   | "austausch"
   | "einstellungen"
   | "benutzer"
-  | "abmelden";
+  | "abmelden"
+  // ── Aktionen in Kopfzeilen und Karten der Computer-Oberfläche ─────────
+  | "stift"
+  | "kamera"
+  | "drucken"
+  | "hoch"
+  | "runter";

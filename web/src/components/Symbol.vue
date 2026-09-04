@@ -109,5 +109,23 @@ defineProps<{ name: SymbolName; groesse?: number }>();
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
       <path d="M16 17l5-5-5-5M21 12H9" />
     </template>
+    <template v-else-if="name === 'stift'">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </template>
+    <template v-else-if="name === 'kamera'">
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z" />
+      <circle cx="12" cy="13" r="4" />
+    </template>
+    <template v-else-if="name === 'drucken'">
+      <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+      <rect x="6" y="14" width="12" height="8" />
+    </template>
+    <template v-else-if="name === 'hoch'">
+      <path d="M18 15l-6-6-6 6" />
+    </template>
+    <template v-else-if="name === 'runter'">
+      <path d="M6 9l6 6 6-6" />
+    </template>
   </svg>
 </template>
