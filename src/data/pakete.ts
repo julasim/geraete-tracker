@@ -13,7 +13,7 @@
 
 import type postgres from "postgres";
 import { db } from "../db/client.js";
-import { NichtGefunden, RegelFehler } from "../api/fehler.js";
+import { NichtGefunden } from "../api/fehler.js";
 
 export interface Paket {
   id: string;
@@ -155,19 +155,3 @@ export async function zubehoerVon(geraetId: string): Promise<PaketGeraet[]> {
      ORDER BY g.bezeichnung`;
 }
 
-/** Das Zubehör mehrerer Geräte auf einmal — für die Sammelbuchung. */
-export async function zubehoerVonMehreren(geraetIds: string[]): Promise<PaketGeraet[]> {
-  if (!geraetIds.length) return [];
-  return db()<PaketGeraet[]>`
-    SELECT g.id, g.inventarnummer, g.bezeichnung, g.status, s.name AS standort
-      FROM geraete g
-      LEFT JOIN standorte s ON s.id = g.aktueller_standort_id
-     WHERE g.gehoert_zu_id = ANY(${geraetIds})
-       AND g.status <> 'ausgemustert'
-       -- Ein Gerät, das selbst schon in der Liste steht, nicht doppelt
-       -- anbieten: Es kann Zubehör des einen und eigenständig gewählt sein.
-       AND NOT (g.id = ANY(${geraetIds}))
-     ORDER BY g.bezeichnung`;
-}
-
-export { RegelFehler };

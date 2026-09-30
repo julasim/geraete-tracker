@@ -18,9 +18,9 @@ import { db } from "../db/client.js";
 import { alsNummer } from "../domain/barcode.js";
 
 /** Dieselbe Sperre wie bei der Geräteanlage — die Vergabe ist EIN Nadelöhr. */
-export const SPERRE_NUMMERNKREIS = 7_319_777;
+const SPERRE_NUMMERNKREIS = 7_319_777;
 
-export type NummernZustand = "vergeben" | "reserviert" | "gesehen";
+type NummernZustand = "vergeben" | "reserviert" | "gesehen";
 
 export interface Etikettennummer {
   nummer: string;

@@ -13,14 +13,14 @@ import { codeArt, normalisiere, suchVarianten } from "../domain/barcode.js";
 import { naechsteFreieNummerInTx, vergibNummerInTx } from "./nummern.js";
 import { pruefePlatzZuStandortInTx } from "./stammdaten.js";
 
-export type GeraetStatus =
+type GeraetStatus =
   | "verfuegbar"
   | "ausgegeben"
   | "wartung"
   | "defekt"
   | "ausgemustert";
 
-export interface Geraet {
+interface Geraet {
   id: string;
   inventarnummer: string | null;
   bezeichnung: string;

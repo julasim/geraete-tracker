@@ -67,10 +67,6 @@ export async function findeNachId(id: string): Promise<Benutzer | null> {
   return zeilen[0] ?? null;
 }
 
-export async function listeBenutzer(): Promise<Benutzer[]> {
-  return db()<Benutzer[]>`SELECT ${felder()} FROM benutzer ORDER BY anzeigename`;
-}
-
 /** Nach erfolgreicher Anmeldung: Zähler zurücksetzen, Zeitstempel merken. */
 export async function vermerkeAnmeldung(id: string): Promise<void> {
   await db()`
@@ -155,20 +151,6 @@ export async function fehlversucheVonIp(ip: string, minuten: number): Promise<nu
      WHERE ip = ${ip} AND erfolg = FALSE
        AND zeitpunkt > NOW() - (${minuten} || ' minutes')::interval`;
   return zeilen[0]?.n ?? 0;
-}
-
-export async function letzteAnmeldeversuche(grenze = 100): Promise<
-  {
-    zeitpunkt: Date;
-    kennung: string | null;
-    ip: string | null;
-    erfolg: boolean;
-    grund: string | null;
-  }[]
-> {
-  return db()`
-    SELECT zeitpunkt, kennung, ip, erfolg, grund FROM anmeldeversuche
-     ORDER BY zeitpunkt DESC LIMIT ${grenze}`;
 }
 
 // ── Verwaltung (AP10) ───────────────────────────────────────────────────────

@@ -7,7 +7,7 @@ import { hashePasswort } from "../../src/domain/passwort.js";
 import { app } from "../../src/api/server.js";
 import { COOKIE_NAME } from "../../src/api/auth.js";
 
-export const TEST_PASSWORT = "Kranfahrt-Ziegel-Winter-7742";
+const TEST_PASSWORT = "Kranfahrt-Ziegel-Winter-7742";
 
 export interface TestKonto {
   id: string;

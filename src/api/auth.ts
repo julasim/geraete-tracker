@@ -18,7 +18,7 @@ import { hatRecht, RECHT_TEXT, type Recht } from "../domain/rechte.js";
 
 export const COOKIE_NAME = "gt_sitzung";
 
-export interface TokenInhalt {
+interface TokenInhalt {
   sub: string; // Benutzer-ID
   tv: number; // token_version zum Zeitpunkt der Ausstellung
 }
@@ -40,7 +40,7 @@ export function stelleTokenAus(benutzer: Pick<Benutzer, "id" | "token_version">)
   });
 }
 
-export function pruefeToken(token: string): TokenInhalt {
+function pruefeToken(token: string): TokenInhalt {
   const inhalt = jwt.verify(token, JWT_SECRET, { algorithms: ["HS256"] });
   if (typeof inhalt === "string" || !inhalt.sub || typeof inhalt.sub !== "string") {
     throw new Error("Token ohne gültigen Inhalt");

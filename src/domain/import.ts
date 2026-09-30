@@ -42,7 +42,7 @@ export const SPALTEN = {
 } as const;
 
 /** Die Felder, die der Import tatsächlich schreibt. */
-export type Feld =
+type Feld =
   | "bezeichnung"
   | "hersteller"
   | "modell"
@@ -68,7 +68,7 @@ export interface VorhandenesGeraet {
   schlagworte: { id: string; name: string }[];
 }
 
-export type ZeilenArt = "neu" | "geaendert" | "unveraendert" | "konflikt" | "fehler";
+type ZeilenArt = "neu" | "geaendert" | "unveraendert" | "konflikt" | "fehler";
 
 export interface GepruefteZeile {
   /** Zeilennummer in der Datei, wie der Benutzer sie in Excel sieht (Kopfzeile = 1). */

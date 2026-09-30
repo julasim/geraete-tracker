@@ -32,7 +32,6 @@ services:
     environment:
       NODE_ENV: production
       API_PORT: 3000
-      APP_HOSTNAME: ${APP_HOSTNAME:-localhost}
       # Wird hier zusammengesetzt, damit das Passwort nur an einer Stelle steht.
       DATABASE_URL: postgres://${POSTGRES_USER:-tracker}:${POSTGRES_PASSWORD:?In der .env fehlt POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-tracker}
       DB_AUTO_MIGRATE: "true"

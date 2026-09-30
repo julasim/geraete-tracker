@@ -120,9 +120,3 @@ export async function entferneDatei(id: string): Promise<void> {
   }
 }
 
-/** Titelbilder für eine ganze Liste — ein Aufruf statt einer je Gerät. */
-export async function titelbilder(): Promise<Record<string, string>> {
-  const zeilen = await db()<{ geraet_id: string; id: string }[]>`
-    SELECT geraet_id, id FROM dateien WHERE ist_titelbild`;
-  return Object.fromEntries(zeilen.map((z) => [z.geraet_id, z.id]));
-}

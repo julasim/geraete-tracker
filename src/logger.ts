@@ -44,8 +44,6 @@ function schreibe(stufe: Stufe, text: string, daten?: Record<string, unknown>): 
   else process.stdout.write(ausgabe + "\n");
 }
 
-export const logDebug = (text: string, daten?: Record<string, unknown>) =>
-  schreibe("debug", text, daten);
 export const logInfo = (text: string, daten?: Record<string, unknown>) =>
   schreibe("info", text, daten);
 export const logWarn = (text: string, daten?: Record<string, unknown>) =>

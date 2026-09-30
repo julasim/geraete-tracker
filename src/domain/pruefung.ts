@@ -65,9 +65,3 @@ export function tageBis(ziel: Date, heute = new Date()): number {
   return Math.round((a - b) / 86_400_000);
 }
 
-export const AMPEL_TEXT: Record<Ampel, string> = {
-  ueberfaellig: "überfällig",
-  faellig: "fällig",
-  bald: "bald fällig",
-  ok: "in Ordnung",
-};

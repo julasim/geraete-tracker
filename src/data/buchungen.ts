@@ -21,7 +21,7 @@ import {
   type Status,
 } from "../domain/status.js";
 
-export interface Buchung {
+interface Buchung {
   id: string;
   geraet_id: string;
   art: Buchungsart;

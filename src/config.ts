@@ -38,7 +38,6 @@ function schalter(name: string, standard: boolean): boolean {
 // ── Betrieb ────────────────────────────────────────────────────────────────
 export const PRODUKTION = istProduktion;
 export const API_PORT = zahl("API_PORT", 3000);
-export const APP_HOSTNAME = process.env.APP_HOSTNAME?.trim() || "localhost";
 export const LOG_LEVEL = process.env.LOG_LEVEL?.trim() || "info";
 
 // ── Datenbank ──────────────────────────────────────────────────────────────
