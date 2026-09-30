@@ -16,6 +16,9 @@ vite.log
 # Lokales Tooling (Workspace-Konvention)
 .claude/
 
+# Binärdateien / Archive
+*.zip
+
 # Betriebssystem / Editor
 Thumbs.db
 .DS_Store
