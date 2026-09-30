@@ -38,8 +38,22 @@ kaum Rechenzeit. 4 GB RAM reichen mit Reserve.
 
 ## Einrichten
 
+**Der schnelle Weg** — ein Skript, das alles abfragt und einrichtet:
+
 ```bash
-git clone <repo-adresse> geraete-tracker
+git clone https://github.com/julasim/geraete-tracker.git
+cd geraete-tracker
+./scripts/installieren.sh
+```
+
+Das Skript prüft Docker, legt die `.env` mit sicheren Geheimnissen an,
+fragt die Domain, baut die Container und legt das erste Benutzerkonto an.
+Läuft es ein zweites Mal, überspringt es vorhandene Schritte.
+
+**Von Hand** — wenn man die Kontrolle über jeden Schritt will:
+
+```bash
+git clone https://github.com/julasim/geraete-tracker.git
 cd geraete-tracker
 cp .env.example .env
 ```
@@ -274,6 +288,19 @@ sie wieder. Es fragt einmal nach, weil der aktuelle Stand dabei verloren geht.
 ---
 
 ## Neue Fassung einspielen
+
+**Der schnelle Weg** — ein Befehl sichert, holt, baut und prüft:
+
+```bash
+cd geraete-tracker
+./scripts/aktualisieren.sh
+```
+
+Das Skript prüft, ob es Neues gibt, sichert vorher, holt die neue Fassung
+von GitHub (`git pull`), baut das App-Image neu und wartet, bis die Anwendung
+gesund ist. Bei einem Fehler zeigt es den Befehl zum Zurückrollen.
+
+**Von Hand:**
 
 ```bash
 cd geraete-tracker
