@@ -77,4 +77,4 @@ export const ETIKETT_FORMAT = process.env.ETIKETT_FORMAT?.trim() || "70x37";
 
 // ── Dateien ────────────────────────────────────────────────────────────────
 export const DATA_PATH = process.env.DATA_PATH?.trim() || "./daten";
-export const UPLOAD_MAX_BYTES = zahl("UPLOAD_MAX_MB", 5) * 1024 * 1024;
+export const UPLOAD_MAX_BYTES = zahl("UPLOAD_MAX_MB", 100) * 1024 * 1024;
