@@ -117,6 +117,50 @@ export async function leseDatei(relativ: string): Promise<{
   }
 }
 
+/**
+ * Nimmt ein Bild aus einem ZIP-Paket entgegen — wie nimmDateiAn, aber
+ * aus einem Buffer statt einem File-Objekt.
+ */
+export async function nimmBildAusPaketAn(
+  inhalt: Buffer,
+  unterordner: string,
+): Promise<GespeicherteDatei> {
+  if (inhalt.length === 0) throw new EingabeFehler("Die Datei ist leer.");
+  if (inhalt.length > UPLOAD_MAX_BYTES) {
+    const grenzeMB = Math.round(UPLOAD_MAX_BYTES / 1024 / 1024);
+    throw new EingabeFehler(
+      `Die Datei ist zu groß (${(inhalt.length / 1024 / 1024).toFixed(1)} MB). ` +
+        `Erlaubt sind bis zu ${grenzeMB} MB.`,
+    );
+  }
+
+  const erkannt = SIGNATUREN.find((s) => s.pruefe(inhalt));
+  if (!erkannt) {
+    throw new EingabeFehler(
+      "Dieser Dateityp wird nicht angenommen. Erlaubt sind Bilder (JPG, PNG, WebP) und PDF.",
+    );
+  }
+
+  const name = `${randomUUID()}.${erkannt.endung}`;
+  const relativ = join(unterordner, name).replace(/\\/g, "/");
+  const ziel = resolve(DATA_PATH, relativ);
+
+  const wurzel = resolve(DATA_PATH);
+  if (!ziel.startsWith(wurzel)) {
+    throw new EingabeFehler("Ungültiger Ablageort.");
+  }
+
+  await mkdir(dirname(ziel), { recursive: true });
+  await writeFile(ziel, inhalt);
+
+  return {
+    pfad: relativ,
+    mime: erkannt.mime,
+    groesse: inhalt.length,
+    art: erkannt.mime === "application/pdf" ? "dokument" : "foto",
+  };
+}
+
 export async function loescheDatei(relativ: string): Promise<void> {
   const wurzel = resolve(DATA_PATH);
   const voll = resolve(wurzel, relativ);

@@ -4,9 +4,10 @@ Web-Anwendung für Handy und iPad: Baumaschinen mit vorhandenen 1D-Strichcode-Et
 scannen, ausgeben, zurücknehmen — mit lückenloser Historie, wer ein Gerät wann auf
 welche Baustelle gebracht hat.
 
-**Stand: 2026-08-31 — AP1 bis AP23 fertig, als Docker-Paket abgenommen.** Anmelden, scannen, ausgeben,
+**Stand: 2026-10-01 — AP1 bis AP25 + ZIP-Paket fertig.** Anmelden, scannen, ausgeben,
 zurücknehmen, umbuchen; Fotos und Dokumente; Prüfungen; Schäden; Zubehör;
-Geräte anlegen und bearbeiten, Import/Export als Tabelle, Etikettendruck;
+Geräte anlegen und bearbeiten, Import/Export als Tabelle und **als ZIP-Paket
+(CSV + Bilder je Inventarnummer)**, Etikettendruck;
 **Benutzerverwaltung in der Oberfläche mit frei zusammenstellbaren Rollen.**
 **Läuft als drei Docker-Container auf dem Mini-PC** (Caddy, Anwendung, Datenbank) — Aufsetzen, Sicherung und
 Fehlersuche: [`docs/BETRIEB.md`](docs/BETRIEB.md).
@@ -98,6 +99,15 @@ offenen Schadens gibt es wieder frei. Zubehör als Selbstbezug, **eine Ebene tie
 
 **AP9 — Bestandserfassung.** Geräte anlegen und bearbeiten in der Oberfläche,
 Import und Export als Tabelle, Etikettendruck (Code 128, A4-Bögen).
+**ZIP-Paket (seit 2026-10-01):** Export und Import als ZIP mit `geraete.csv`
+im Stammverzeichnis und Bildern unter `bilder/<inventarnummer>/` (jpg, jpeg,
+png, webp, pdf). Export: `GET /export/geraete.zip` bündelt CSV + alle
+Gerätebilder. Import: `POST /import/paket/pruefen` (Vorschau, schreibt nichts)
+und `POST /import/paket` (CSV zuerst, dann Bilder den Geräten zuordnen).
+Größengrenze 200 MB. Bibliothek: `adm-zip`. Reine Paket-Logik in
+`src/domain/paket.ts`, Bild-Upload aus Puffer in `src/api/upload.ts`
+(`nimmBildAusPaketAn`), Datenabfragen in `src/data/austausch.ts`
+(`bilderFuerExport`, `leseBildVonPlatte`, `importiereBilder`).
 **279 Tests**, dazu `scripts/durchlauf-erfassung.mjs`.
 
 **AP10 — Benutzerverwaltung und Rollen.** Konten lassen sich in der Oberfläche

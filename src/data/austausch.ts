@@ -5,6 +5,8 @@
  * ohne Datenbank). Hier steht nur, was gelesen und geschrieben wird.
  */
 
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import type postgres from "postgres";
 import { db } from "../db/client.js";
 import { RegelFehler } from "../api/fehler.js";
@@ -17,6 +19,10 @@ import {
   type Pruefergebnis,
   type VorhandenesGeraet,
 } from "../domain/import.js";
+import { DATA_PATH } from "../config.js";
+import { speichereDatei } from "./dateien.js";
+import { nimmBildAusPaketAn } from "../api/upload.js";
+import type { EntpacktesBild } from "../domain/paket.js";
 
 /** Der Bestand, wie ihn die Import-Prüfung braucht. */
 export async function bestandFuerAbgleich(): Promise<VorhandenesGeraet[]> {
@@ -325,4 +331,79 @@ async function setzeSchlagworte(
   await tx`INSERT INTO geraet_schlagworte ${tx(
     ids.map((schlagwort_id) => ({ geraet_id: geraetId, schlagwort_id })),
   )} ON CONFLICT DO NOTHING`;
+}
+
+// ── ZIP-Paket ──────────────────────────────────────────────────────────────
+
+export interface BildFuerExport {
+  inventarnummer: string;
+  dateiname: string;
+  pfad: string;
+}
+
+export async function bilderFuerExport(): Promise<BildFuerExport[]> {
+  return db()<BildFuerExport[]>`
+    SELECT g.inventarnummer, d.dateiname, d.pfad
+      FROM dateien d
+      JOIN geraete g ON g.id = d.geraet_id
+     WHERE g.status <> 'ausgemustert'
+       AND g.inventarnummer IS NOT NULL
+     ORDER BY g.inventarnummer, d.sort_order, d.hochgeladen_am`;
+}
+
+export async function leseBildVonPlatte(relativ: string): Promise<Buffer> {
+  const voll = resolve(DATA_PATH, relativ);
+  return readFile(voll);
+}
+
+export interface BilderImportErgebnis {
+  hochgeladen: number;
+  uebersprungen: number;
+  fehler: string[];
+}
+
+export async function importiereBilder(
+  bilder: Map<string, EntpacktesBild[]>,
+  akteurId: string,
+): Promise<BilderImportErgebnis> {
+  const geraete = await db()<{ id: string; inventarnummer: string }[]>`
+    SELECT id, inventarnummer FROM geraete
+     WHERE inventarnummer IS NOT NULL AND status <> 'ausgemustert'`;
+
+  const nachNummer = new Map(geraete.map((g) => [g.inventarnummer, g.id]));
+
+  let hochgeladen = 0;
+  let uebersprungen = 0;
+  const fehler: string[] = [];
+
+  for (const [invNr, dateien] of bilder) {
+    const geraetId = nachNummer.get(invNr);
+    if (!geraetId) {
+      uebersprungen += dateien.length;
+      fehler.push(`${invNr}: Kein Gerät mit dieser Inventarnummer gefunden.`);
+      continue;
+    }
+
+    for (const datei of dateien) {
+      try {
+        const gespeichert = await nimmBildAusPaketAn(datei.inhalt, `geraete/${geraetId}`);
+        await speichereDatei({
+          geraet_id: geraetId,
+          art: gespeichert.art,
+          dateiname: datei.dateiname,
+          pfad: gespeichert.pfad,
+          mime: gespeichert.mime,
+          groesse: gespeichert.groesse,
+          hochgeladen_von: akteurId,
+        });
+        hochgeladen++;
+      } catch (f) {
+        uebersprungen++;
+        const grund = f instanceof Error ? f.message : "Unbekannter Fehler";
+        fehler.push(`${invNr}/${datei.dateiname}: ${grund}`);
+      }
+    }
+  }
+
+  return { hochgeladen, uebersprungen, fehler };
 }

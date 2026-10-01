@@ -29,6 +29,7 @@
   "dependencies": {
     "@hono/node-server": "^1.19.9",
     "@node-rs/argon2": "^2.0.2",
+    "adm-zip": "^0.6.1",
     "bwip-js": "^4.11.3",
     "dotenv": "^17.2.4",
     "hono": "^4.10.9",
@@ -39,6 +40,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/adm-zip": "^0.5.8",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^24.10.1",
     "@types/pdfkit": "^0.17.6",

@@ -33,6 +33,7 @@ interface Vorschau {
   gelesen: number;
   spalten: string[];
   trennzeichen: string;
+  bilder?: { geraete: number; dateien: number };
 }
 
 const bestand = useBestand();
@@ -42,7 +43,14 @@ const gewaehlteDatei = ref<File | null>(null);
 const vorschau = ref<Vorschau | null>(null);
 const laeuft = ref(false);
 const fehler = ref<string | null>(null);
-const fertig = ref<{ angelegt: number; geaendert: number; uebersprungen: number } | null>(null);
+const fertig = ref<{
+  angelegt: number;
+  geaendert: number;
+  uebersprungen: number;
+  bilder?: { hochgeladen: number; uebersprungen: number; fehler: string[] } | null;
+} | null>(null);
+
+const istZip = computed(() => gewaehlteDatei.value?.name.toLowerCase().endsWith(".zip") ?? false);
 
 const FELD_TEXT: Record<string, string> = {
   bezeichnung: "Bezeichnung",
@@ -77,7 +85,8 @@ async function pruefen(): Promise<void> {
   try {
     const formular = new FormData();
     formular.append("datei", gewaehlteDatei.value);
-    const antwort = await fetch("/api/import/geraete/pruefen", {
+    const endpunkt = istZip.value ? "/api/import/paket/pruefen" : "/api/import/geraete/pruefen";
+    const antwort = await fetch(endpunkt, {
       method: "POST",
       body: formular,
       credentials: "same-origin",
@@ -99,7 +108,8 @@ async function importieren(): Promise<void> {
   try {
     const formular = new FormData();
     formular.append("datei", gewaehlteDatei.value);
-    const antwort = await fetch("/api/import/geraete", {
+    const endpunkt = istZip.value ? "/api/import/paket" : "/api/import/geraete";
+    const antwort = await fetch(endpunkt, {
       method: "POST",
       body: formular,
       credentials: "same-origin",
@@ -158,11 +168,14 @@ function abbrechen(): void {
         <h2 class="pt-mikro abschnitt">Export</h2>
         <div class="pt-karte block">
           <p class="text">
-            Lädt den gesamten Bestand als Tabelle herunter — {{ bestand.geraete.length }} Geräte.
-            Die Datei öffnet sich in Excel und lässt sich nach dem Bearbeiten wieder einlesen.
+            Lädt den gesamten Bestand herunter — {{ bestand.geraete.length }} Geräte.
+            Die Tabelle öffnet sich in Excel und lässt sich nach dem Bearbeiten wieder einlesen.
           </p>
           <a class="pt-btn pt-btn--breit" href="/api/export/geraete.csv" download>
-            Bestand herunterladen
+            Tabelle (CSV)
+          </a>
+          <a class="pt-btn pt-btn--breit" href="/api/export/geraete.zip" download>
+            Tabelle mit Bildern (ZIP)
           </a>
         </div>
       </section>
@@ -175,6 +188,11 @@ function abbrechen(): void {
           <strong>Import abgeschlossen.</strong><br />
           {{ fertig.angelegt }} Geräte angelegt, {{ fertig.geaendert }} geändert,
           {{ fertig.uebersprungen }} unverändert.
+          <template v-if="fertig.bilder">
+            <br />{{ fertig.bilder.hochgeladen }} Bilder hochgeladen<template
+              v-if="fertig.bilder.uebersprungen"
+            >, {{ fertig.bilder.uebersprungen }} übersprungen</template>.
+          </template>
         </div>
 
         <p v-if="fehler" class="pt-meldung pt-meldung--fehler">{{ fehler }}</p>
@@ -188,7 +206,7 @@ function abbrechen(): void {
           <input
             ref="dateiEl"
             type="file"
-            accept=".csv,text/csv,text/plain"
+            accept=".csv,.zip,text/csv,text/plain,application/zip"
             hidden
             @change="dateiGewaehlt"
           />
@@ -224,6 +242,11 @@ function abbrechen(): void {
             <p class="pt-gedaempft datei">
               {{ vorschau.gelesen }} Zeilen gelesen · Trennzeichen
               <code>{{ vorschau.trennzeichen }}</code>
+            </p>
+
+            <p v-if="vorschau.bilder && vorschau.bilder.dateien > 0" class="pt-meldung pt-meldung--hinweis hinweis">
+              {{ vorschau.bilder.dateien }} Bilder für {{ vorschau.bilder.geraete }} Geräte
+              werden hochgeladen.
             </p>
 
             <p v-for="(h, i) in vorschau.hinweise" :key="i" class="pt-meldung pt-meldung--hinweis hinweis">
