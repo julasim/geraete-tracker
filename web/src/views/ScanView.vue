@@ -456,13 +456,14 @@ watch(eingabe, (wert) => {
 /* ── Sucher ─────────────────────────────────────────────── */
 .sucher {
   position: relative;
+  width: 100%;
+  height: 46dvh;
   background: #000;
-  aspect-ratio: 3 / 4;
-  max-height: 46dvh;
   overflow: hidden;
 }
 @media (min-width: 720px) {
   .sucher {
+    height: auto;
     aspect-ratio: 16 / 10;
     border-radius: var(--radius-xl);
     margin: var(--space-4) var(--space-4) 0;
