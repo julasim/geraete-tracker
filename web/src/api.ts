@@ -80,7 +80,7 @@ async function anfrage<T>(pfad: string, init: RequestInit = {}): Promise<T> {
     const meldung =
       typeof koerper.error === "string" ? koerper.error : `Fehler ${antwort.status}`;
 
-    if (antwort.status === 401) beiAbmeldung?.();
+    if (antwort.status === 401 && !pfad.startsWith("/auth/passwort")) beiAbmeldung?.();
 
     throw new ApiError(antwort.status, meldung, koerper);
   }

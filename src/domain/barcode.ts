@@ -53,7 +53,7 @@ export function codeArt(code: string): CodeArt {
 
   // Gerätenummern sind bei Julius fünfstellig numerisch. Andere Längen
   // trotzdem zulassen — Zukäufe könnten anders etikettiert sein.
-  return /^[0-9]{1,32}$/.test(sauber) ? "geraet" : "unbrauchbar";
+  return /^[0-9]{1,10}$/.test(sauber) ? "geraet" : "unbrauchbar";
 }
 
 /**

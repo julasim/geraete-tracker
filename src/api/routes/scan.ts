@@ -138,7 +138,7 @@ scanRouten.get("/scan/:code", async (c) => {
         .filter((p) => p.ueberfaellig)
         .map((p) => ({
           art: "pruefung" as const,
-          text: `${p.pruefart} war am ${p.naechste_faellig.toLocaleDateString("de-AT")} fällig.`,
+          text: `${p.pruefart} war am ${new Date(p.naechste_faellig).toLocaleDateString("de-AT")} fällig.`,
         })),
       ...(geraet.offene_schaeden > 0
         ? [
