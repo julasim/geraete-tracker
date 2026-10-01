@@ -14,9 +14,10 @@
  */
 
 import { createReadStream } from "node:fs";
-import { mkdir, stat, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
+import sharp from "sharp";
 import { DATA_PATH, UPLOAD_MAX_BYTES } from "../config.js";
 import { EingabeFehler, NichtGefunden } from "./fehler.js";
 
@@ -159,6 +160,52 @@ export async function nimmBildAusPaketAn(
     groesse: inhalt.length,
     art: erkannt.mime === "application/pdf" ? "dokument" : "foto",
   };
+}
+
+const THUMB_BREITE = 400;
+const THUMB_QUALITAET = 70;
+const THUMB_ORDNER = "_thumbs";
+
+/**
+ * Liefert ein verkleinertes JPEG-Vorschaubild. Beim ersten Aufruf wird es
+ * erzeugt und neben dem Original gecacht; danach kommt es aus dem Cache.
+ * PDFs bekommen kein Thumbnail — dort liefert die Funktion null.
+ */
+export async function leseThumbnail(relativ: string): Promise<{
+  puffer: Buffer;
+  mime: string;
+} | null> {
+  const wurzel = resolve(DATA_PATH);
+  const original = resolve(wurzel, relativ);
+  if (!original.startsWith(wurzel)) throw new NichtGefunden("Datei");
+
+  const endung = relativ.split(".").pop()?.toLowerCase();
+  if (!endung || endung === "pdf") return null;
+
+  const thumbPfad = resolve(wurzel, THUMB_ORDNER, relativ.replace(/\.[^.]+$/, ".jpg"));
+
+  try {
+    const puffer = await readFile(thumbPfad);
+    return { puffer, mime: "image/jpeg" };
+  } catch {
+    // Noch kein Thumbnail — erzeugen.
+  }
+
+  try {
+    await stat(original);
+  } catch {
+    throw new NichtGefunden("Datei");
+  }
+
+  const puffer = await sharp(original)
+    .resize(THUMB_BREITE, undefined, { withoutEnlargement: true })
+    .jpeg({ quality: THUMB_QUALITAET })
+    .toBuffer();
+
+  await mkdir(dirname(thumbPfad), { recursive: true });
+  await writeFile(thumbPfad, puffer);
+
+  return { puffer, mime: "image/jpeg" };
 }
 
 export async function loescheDatei(relativ: string): Promise<void> {

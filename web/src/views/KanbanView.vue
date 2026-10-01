@@ -45,7 +45,7 @@ onUnmounted(() => clearInterval(intervall));
       <div class="board__bild-rahmen">
         <img
           v-if="g.titelbild_id"
-          :src="`/api/dateien/${g.titelbild_id}`"
+          :src="`/api/dateien/${g.titelbild_id}/thumb`"
           :alt="g.bezeichnung"
           class="board__bild"
           loading="lazy"

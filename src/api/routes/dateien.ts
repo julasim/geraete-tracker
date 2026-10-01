@@ -18,7 +18,7 @@ import {
   setzeTitelbild,
   speichereDatei,
 } from "../../data/dateien.js";
-import { leseDatei, nimmDateiAn } from "../upload.js";
+import { leseDatei, leseThumbnail, nimmDateiAn } from "../upload.js";
 
 export const dateiRouten = new Hono<AppEnv>();
 
@@ -89,6 +89,28 @@ dateiRouten.get("/dateien/:id", async (c) => {
   c.header("Cache-Control", "private, max-age=3600");
 
   return c.body(strom as unknown as ReadableStream);
+});
+
+/**
+ * Verkleinertes Vorschaubild — für Listen und das Board, wo 115 Originale
+ * à 3 MB den Browser lahmlegen. Beim ersten Aufruf erzeugt, danach gecacht.
+ */
+dateiRouten.get("/dateien/:id/thumb", async (c) => {
+  const datei = await findeDatei(pfadId(c));
+  const thumb = await leseThumbnail(datei.pfad);
+
+  if (!thumb) {
+    const { strom, groesse } = await leseDatei(datei.pfad);
+    c.header("Content-Type", datei.mime);
+    c.header("Content-Length", String(groesse));
+    c.header("Cache-Control", "private, max-age=86400");
+    return c.body(strom as unknown as ReadableStream);
+  }
+
+  c.header("Content-Type", thumb.mime);
+  c.header("Content-Length", String(thumb.puffer.length));
+  c.header("Cache-Control", "private, max-age=86400");
+  return c.body(new Uint8Array(thumb.puffer) as unknown as ReadableStream);
 });
 
 dateiRouten.post("/dateien/:id/titelbild", darf("dateien.verwalten"), async (c) => {
