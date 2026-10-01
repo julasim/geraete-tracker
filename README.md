@@ -15,14 +15,16 @@ Der Weg für den Echtbetrieb — drei Container (Eingang, Anwendung, Datenbank),
 keine Node-Installation nötig:
 
 ```bash
-git clone <repo-adresse> geraete-tracker
+git clone https://github.com/julasim/geraete-tracker.git
 cd geraete-tracker
-cp .env.example .env      # POSTGRES_PASSWORD, JWT_SECRET und DOMAIN setzen!
-docker compose up -d --build
-docker compose exec app node dist/werkzeuge/benutzer-anlegen.js --name julius --rolle verwaltung
+./scripts/installieren.sh
 ```
 
-Vollständig mit HTTPS, Sicherung und Fehlersuche:
+Schritt für Schritt (jede Variable erklärt, TLS-Varianten, Zertifikate auf
+Geräte, Sicherung):
+**[`docs/INSTALLATION.md`](docs/INSTALLATION.md)**.
+
+Betrieb im Alltag (Sicherung, Aktualisierung, Fehlersuche):
 **[`docs/BETRIEB.md`](docs/BETRIEB.md)**.
 
 Alles Weitere hier beschreibt die **Entwicklung** auf dem eigenen Rechner.
@@ -89,11 +91,11 @@ API und Web-Anwendung aus.
 ## Prüfen, dass alles läuft
 
 ```bash
-npm test          # 357 Tests gegen die Datenbank (Server)
-npm run test:web  # 20 Tests der Oberfläche, ohne Datenbank
+npm test          # 391 Tests gegen die Datenbank (Server)
+npm run test:web  # 212 Tests der Oberfläche, ohne Datenbank
 ```
 
-**377 Tests.** Zwei getrennte Suiten mit Absicht: Die Server-Tests brauchen
+**603 Tests.** Zwei getrennte Suiten mit Absicht: Die Server-Tests brauchen
 eine laufende Datenbank, die der Oberfläche nicht. Müsste man für einen
 Store-Test erst Postgres hochfahren, führte sie niemand mehr aus. Zusätzlich sechs Durchläufe **gegen die laufende Anwendung** — die
 Testsuite läuft im selben Prozess und würde nicht merken, wenn der gebaute
@@ -178,10 +180,10 @@ src/          Server: api/ (Routen), data/ (Datenbankzugriff),
               werkzeuge/ (Kontoanlage, Migration, Schemaprüfung — werden
               mitkompiliert, damit sie auch im Container zur Verfügung stehen)
 web/          Vue-3-Oberfläche (mobile-first, Navigation unten)
-tests/        357 Tests (Vitest)
+tests/        391 Server-Tests + 212 Frontend-Tests (Vitest)
 caddy/        Caddyfile — der Eingang: TLS und Weiterleitung
-docs/         BETRIEB.md (Mini-PC), BEDIENUNG.md (Etiketten, Benutzer, Rollen),
-              PLAN.md, scanner-abnahme.md
+docs/         INSTALLATION.md (Erstinstallation), BETRIEB.md (Alltag),
+              BEDIENUNG.md (Etiketten, Benutzer, Rollen), PLAN.md, scanner-abnahme.md
 scripts/      Durchläufe gegen die laufende App, Sicherung, Rückspielweg
 ```
 

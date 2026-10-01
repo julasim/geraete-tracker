@@ -67,17 +67,15 @@ export async function ipUeberlastet(ip: string | null): Promise<boolean> {
 /**
  * Ermittelt die Adresse des Anfragenden.
  *
- * Hinter Cloudflare ist CF-Connecting-IP die verlässliche Quelle. Die
- * Kopfzeilen sind grundsätzlich fälschbar; die App ist aber nur über den
- * Tunnel erreichbar, und die Kontosperre wirkt ohnehin unabhängig von der
- * Adresse. Die IP-Grenze ist eine Zusatzbremse, keine tragende Säule.
+ * Die App steht hinter Caddy (nicht Cloudflare), der X-Forwarded-For setzt.
+ * CF-Connecting-IP und X-Real-IP kommen vom Client und sind fälschbar —
+ * deshalb nur X-Forwarded-For vertrauen (Caddy schreibt die echte IP als
+ * erstes Element) und die fälschbaren Header ignorieren.
  */
 export function klientIp(c: {
   req: { header(name: string): string | undefined };
 }): string | null {
-  const cf = c.req.header("cf-connecting-ip");
-  if (cf) return cf.trim();
   const xff = c.req.header("x-forwarded-for");
   if (xff) return (xff.split(",")[0] ?? "").trim() || null;
-  return c.req.header("x-real-ip")?.trim() ?? null;
+  return null;
 }

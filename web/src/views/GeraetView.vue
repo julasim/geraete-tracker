@@ -25,7 +25,7 @@
  * Aufbauten. Die Logik darunter — Laden, Schaden melden, Fristen, Zeitpunkte
  * — teilen sie sich vollständig.
  */
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { api, ApiError } from "@/api";
 import { ampelKlasse, frist } from "@/format";
@@ -57,7 +57,7 @@ const anmeldung = useAnmeldung();
 const bestand = useBestand();
 const { breit } = useBreite();
 
-const id = route.params.id as string;
+const id = computed(() => route.params.id as string);
 
 const geraet = ref<Geraet | null>(null);
 const dateien = ref<Datei[]>([]);
@@ -185,7 +185,7 @@ function buchen(art: Buchungsart): void {
     dialogArt.value = art;
     return;
   }
-  router.push(`/buchen/${id}/${art}`);
+  router.push(`/buchen/${id.value}/${art}`);
 }
 
 /**
@@ -203,12 +203,13 @@ async function nachDerBuchung(): Promise<void> {
 
 async function laden(): Promise<void> {
   try {
+    const aktuelleId = id.value;
     const [g, d, h, p, s] = await Promise.all([
-      api.get<Geraet>(`/geraete/${id}`),
-      api.get<Datei[]>(`/geraete/${id}/dateien`),
-      api.get<Buchung[]>(`/geraete/${id}/historie`),
-      api.get<Pruefung[]>(`/geraete/${id}/pruefungen`),
-      api.get<Schaden[]>(`/geraete/${id}/schaeden`),
+      api.get<Geraet>(`/geraete/${aktuelleId}`),
+      api.get<Datei[]>(`/geraete/${aktuelleId}/dateien`),
+      api.get<Buchung[]>(`/geraete/${aktuelleId}/historie`),
+      api.get<Pruefung[]>(`/geraete/${aktuelleId}/pruefungen`),
+      api.get<Schaden[]>(`/geraete/${aktuelleId}/schaeden`),
     ]);
     geraet.value = g;
     dateien.value = d;
@@ -238,7 +239,7 @@ async function schadenMelden(): Promise<void> {
   if (schadenLaeuft.value) return;
   schadenLaeuft.value = true;
   try {
-    const antwort = await api.post<{ geraet: Geraet }>(`/geraete/${id}/schaeden`, {
+    const antwort = await api.post<{ geraet: Geraet }>(`/geraete/${id.value}/schaeden`, {
       beschreibung: schadenText.value,
       schwere: schadenSchwere.value,
     });
@@ -262,6 +263,13 @@ async function schadenErledigen(schaden: Schaden): Promise<void> {
   bestand.ersetze(antwort.geraet);
   await laden();
 }
+
+watch(id, () => {
+  laedt.value = true;
+  fehler.value = null;
+  geraet.value = null;
+  void laden();
+});
 
 onMounted(laden);
 </script>

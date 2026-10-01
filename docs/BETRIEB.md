@@ -1,5 +1,8 @@
 # Betrieb auf dem Mini-PC
 
+> **Erstinstallation?** → [`INSTALLATION.md`](INSTALLATION.md) — dort steht der
+> Weg von Null bis zum ersten Anmelden, jede Variable erklärt.
+
 Der Geräte-Tracker läuft als drei Docker-Container: der Eingang (Caddy), die
 Anwendung und ihre Datenbank. Weboberfläche, API und Etikettendruck stecken
 alle in der Anwendung.

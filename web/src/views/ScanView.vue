@@ -154,6 +154,7 @@ function trefferAufnehmen(g: { id: string }): boolean {
   // Sofort weiterscannen: Die Karte würde nur im Weg stehen.
   ergebnis.value = null;
   eingabe.value = "";
+  scanner.weiter();
   return true;
 }
 

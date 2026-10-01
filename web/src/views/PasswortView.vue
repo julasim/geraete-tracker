@@ -2,9 +2,11 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { api, ApiError } from "@/api";
+import { useAnmeldung } from "@/stores/anmeldung";
 import Kopf from "@/components/Kopf.vue";
 
 const router = useRouter();
+const anmeldung = useAnmeldung();
 const alt = ref("");
 const neu = ref("");
 const wiederholung = ref("");
@@ -21,6 +23,7 @@ async function speichern(): Promise<void> {
   laeuft.value = true;
   try {
     await api.post("/auth/passwort", { altesPasswort: alt.value, neuesPasswort: neu.value });
+    anmeldung.passwortWechselNoetig = false;
     fertig.value = true;
   } catch (f) {
     fehler.value = f instanceof ApiError ? f.message : "Konnte nicht geändert werden";

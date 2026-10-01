@@ -229,11 +229,19 @@ unerklärliche Fehlermeldungen zu laufen.
 Das entsteht auf dem Server, nicht im Browser:
 
 ```bash
+# Im Docker-Container (Betrieb auf dem Mini-PC):
+docker compose exec app node dist/werkzeuge/benutzer-anlegen.js \
+  --name julius --rolle verwaltung
+
+# In der Entwicklung (ohne Docker):
 npm run benutzer:anlegen -- --name julius --rolle verwaltung
 ```
 
 Bewusst kein Einrichtungsassistent im Web: Eine offen erreichbare Seite, an der
 sich das erste Konto anlegen lässt, ist ein Wettrennen, das man verlieren kann.
+
+Die vollständige Anleitung mit allen Schritten steht in
+[`INSTALLATION.md`](INSTALLATION.md).
 
 ---
 
