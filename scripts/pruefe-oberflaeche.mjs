@@ -121,6 +121,22 @@ const OHNE_BEDIENUNG = new Map([
     "POST /api/etiketten/altbestand",
     "Einmalige Erfassung geklebter Altetiketten beim Einrichten, kein wiederkehrender Vorgang",
   ],
+  [
+    "POST /api/import/geraete/pruefen",
+    "Bedienung in AustauschView.vue über Variable (istZip → endpunkt), vom Regex nicht auflösbar",
+  ],
+  [
+    "POST /api/import/geraete",
+    "Bedienung in AustauschView.vue über Variable (istZip → endpunkt), vom Regex nicht auflösbar",
+  ],
+  [
+    "POST /api/import/paket/pruefen",
+    "Bedienung in AustauschView.vue über Variable (istZip → endpunkt), vom Regex nicht auflösbar",
+  ],
+  [
+    "POST /api/import/paket",
+    "Bedienung in AustauschView.vue über Variable (istZip → endpunkt), vom Regex nicht auflösbar",
+  ],
 ]);
 
 const ohneBedienung = routen
