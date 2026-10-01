@@ -30,4 +30,5 @@ export type SymbolName =
   | "kamera"
   | "drucken"
   | "hoch"
-  | "runter";
+  | "runter"
+  | "board";

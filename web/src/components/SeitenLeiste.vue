@@ -64,6 +64,7 @@ const GRUPPEN: { titel: string; eintraege: Eintrag[] }[] = [
     eintraege: [
       { pfad: "/uebersicht", text: "Übersicht", symbol: "uebersicht" },
       { pfad: "/geraete", text: "Geräte", symbol: "liste" },
+      { pfad: "/board", text: "Board", symbol: "board" },
       { pfad: "/orte", text: "Orte und Regale", symbol: "ort" },
       { pfad: "/pruefungen", text: "Prüfungen", symbol: "kalender", zaehler: true },
       { pfad: "/pakete", text: "Pakete", symbol: "paket" },

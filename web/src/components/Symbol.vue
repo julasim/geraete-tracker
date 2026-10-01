@@ -127,5 +127,10 @@ defineProps<{ name: SymbolName; groesse?: number }>();
     <template v-else-if="name === 'runter'">
       <path d="M6 9l6 6 6-6" />
     </template>
+    <template v-else-if="name === 'board'">
+      <rect x="2" y="3" width="6" height="18" rx="1" />
+      <rect x="9" y="3" width="6" height="13" rx="1" />
+      <rect x="16" y="3" width="6" height="16" rx="1" />
+    </template>
   </svg>
 </template>

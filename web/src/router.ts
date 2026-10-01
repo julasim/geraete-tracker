@@ -30,6 +30,7 @@ export const router = createRouter({
       meta: { ohneRahmen: true },
     },
     { path: "/geraete", name: "geraete", component: () => import("@/views/GeraeteView.vue") },
+    { path: "/board", name: "board", component: () => import("@/views/KanbanView.vue") },
     {
       path: "/geraete/neu",
       name: "geraet-neu",
