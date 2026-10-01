@@ -92,8 +92,9 @@ onUnmounted(() => clearInterval(intervall));
 
 /* ── Spalte ─────────────────────────────────────────────── */
 .kanban__spalte {
-  flex: 0 0 280px;
-  min-width: 280px;
+  flex: 1 1 0;
+  min-width: 220px;
+  max-width: 360px;
   display: flex;
   flex-direction: column;
   background: var(--surface-subtle);
@@ -198,7 +199,15 @@ onUnmounted(() => clearInterval(intervall));
   text-align: left;
 }
 
-/* ── Mobil ───────────────────────────────────────────────── */
+/* ── Tablet: Spalten scrollen horizontal ────────────────── */
+@media (max-width: 1023px) {
+  .kanban__spalte {
+    flex: 0 0 260px;
+    max-width: none;
+  }
+}
+
+/* ── Mobil: Spalten untereinander, Karten als Grid ──────── */
 @media (max-width: 767px) {
   .kanban {
     flex-direction: column;
@@ -207,8 +216,11 @@ onUnmounted(() => clearInterval(intervall));
   .kanban__spalte {
     flex: none;
     min-width: 0;
+    max-width: none;
   }
   .kanban__karten {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     max-height: none;
   }
 }
