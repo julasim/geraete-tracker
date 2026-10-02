@@ -156,18 +156,35 @@ for (const { name, text } of oberflaeche) {
   const eigene = new Set();
   for (const m of eigenerStil.matchAll(/\.([a-z][a-z0-9_-]*)/gi)) eigene.add(m[1]);
 
+  /** Prüft eine einzelne Klasse gegen eigene Stile und globale Stylesheets. */
+  function pruefeKlasse(klasse) {
+    if (!klasse || klasse.includes("{") || klasse.includes(":") || klasse.includes("$")) return;
+    if (eigene.has(klasse)) return;
+    if ([...eigene].some((e) => e.startsWith(klasse + "__"))) return;
+    if (new RegExp(`\\.${klasse.replace(/[-]/g, "\\-")}\\b`).test(stile)) return;
+    klassenFehler.push({ name, klasse });
+  }
+
+  // a) Statische class="…"
   for (const m of text.matchAll(/\sclass="([^"]*)"/g)) {
-    for (const klasse of m[1].split(/\s+/)) {
-      // Vue-Ausdrücke (:class) und Bedingungen überspringen
-      if (!klasse || klasse.includes("{") || klasse.includes(":") || klasse.includes("$")) continue;
-      if (eigene.has(klasse)) continue;
-      // Ein BEM-Block darf ohne eigene Regel bleiben, solange es Kind-Regeln
-      // gibt (.konflikt neben .konflikt__stand). Das ist Absicht, kein
-      // Tippfehler — sonst meldete dieses Skript Fehlalarme, und ein
-      // Prüfwerkzeug, dem man nicht glaubt, wird abgeschaltet.
-      if ([...eigene].some((e) => e.startsWith(klasse + "__"))) continue;
-      if (new RegExp(`\\.${klasse.replace(/[-]/g, "\\-")}\\b`).test(stile)) continue;
-      klassenFehler.push({ name, klasse });
+    for (const klasse of m[1].split(/\s+/)) pruefeKlasse(klasse);
+  }
+
+  // b) Dynamische :class-Bindungen — alle in Anführungszeichen stehenden
+  //    Zeichenketten extrahieren, die wie CSS-Klassen aussehen. Trifft
+  //    Objekt-Syntax ({ 'klasse': bed }), Array-Syntax ([`klasse`]) und
+  //    Ternäre (bed ? 'klasse' : ''). Interpolierte Fragmente (`pt-chip--${x}`)
+  //    werden übersprungen, weil der Wert erst zur Laufzeit feststeht.
+  for (const m of text.matchAll(/\s:class="([^"]*)"/g)) {
+    const ausdruck = m[1];
+    for (const s of ausdruck.matchAll(/'([^']+)'/g)) {
+      if (s[1].includes("${")) continue;
+      // Vergleichswerte überspringen: `status === 'erledigt'` ist kein
+      // Klassenname, sondern ein JavaScript-Operand. Erkennbar daran, dass
+      // unmittelbar davor ein Vergleichsoperator steht.
+      const davor = ausdruck.slice(0, s.index).trimEnd();
+      if (/[!=]=={0,1}$/.test(davor)) continue;
+      for (const klasse of s[1].split(/\s+/)) pruefeKlasse(klasse);
     }
   }
 
