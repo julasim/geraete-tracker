@@ -208,6 +208,37 @@ async function bucheInTx(
   }
 }
 
+/**
+ * Rücknahme und Ausfallschaden in EINER Transaktion.
+ *
+ * Ohne das steht das Gerät zwischen zwei HTTP-Aufrufen kurz auf `verfuegbar`
+ * und könnte erneut ausgegeben werden, bevor der Schaden es sperrt.
+ */
+export async function bucheRuecknahmeDefekt(
+  daten: Omit<NeueBuchung, "art" | "ausfall"> & { beschreibung: string },
+  akteurId: string,
+): Promise<{ buchungId: string; schadenId: string }> {
+  return db().begin(async (tx) => {
+    const buchungId = await bucheInTx(tx, { ...daten, art: "ruecknahme" }, akteurId);
+
+    const [geraet] = await tx<{ status: string }[]>`
+      SELECT status FROM geraete WHERE id = ${daten.geraet_id} FOR UPDATE`;
+    if (!geraet) throw new NichtGefunden("Gerät");
+
+    const beschreibung = daten.beschreibung.trim() || "Bei der Rücknahme als defekt gemeldet.";
+    const [schaden] = await tx<{ id: string }[]>`
+      INSERT INTO schaeden (geraet_id, buchung_id, gemeldet_von, beschreibung, schwere)
+      VALUES (${daten.geraet_id}, ${buchungId}, ${akteurId}, ${beschreibung}, 'ausfall')
+      RETURNING id`;
+
+    await tx`UPDATE geraete SET status = 'defekt', rev = rev + 1,
+                   updated_at = NOW(), updated_by = ${akteurId}
+              WHERE id = ${daten.geraet_id}`;
+
+    return { buchungId, schadenId: schaden!.id };
+  });
+}
+
 const ANSICHT = () => db()`
   b.id, b.geraet_id, b.art, b.von_standort_id, b.nach_standort_id, b.nach_lagerplatz_id,
   b.empfaenger_id, b.empfaenger_freitext, b.erfasst_von, b.zeitpunkt,

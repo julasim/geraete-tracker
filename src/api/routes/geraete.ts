@@ -28,8 +28,10 @@ import {
   sucheGeraete,
 } from "../../data/geraete.js";
 import { zubehoerVon } from "../../data/pakete.js";
+import { erlaubteAktionen } from "../../domain/status.js";
 import { EingabeFehler } from "../fehler.js";
 import { pfadId, pfadText } from "../pfad.js";
+import { hatRechtImKontext } from "../auth.js";
 
 export const geraeteRouten = new Hono<AppEnv>();
 
@@ -61,7 +63,11 @@ geraeteRouten.get("/geraete", async (c) => {
   return c.json(alle ? await listeAlleGeraete() : await listeGeraete());
 });
 
-geraeteRouten.get("/geraete/:id", async (c) => c.json(await findeGeraet(pfadId(c))));
+geraeteRouten.get("/geraete/:id", async (c) => {
+  const geraet = await findeGeraet(pfadId(c));
+  const darfBuchen = hatRechtImKontext(c, "buchungen.erfassen");
+  return c.json({ ...geraet, aktionen: erlaubteAktionen(geraet.status, darfBuchen) });
+});
 
 /**
  * Das Zubehör eines Geräts — die Löffel zum Bagger.

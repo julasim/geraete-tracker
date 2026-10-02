@@ -14,7 +14,8 @@ import { z } from "zod";
 import { angemeldet, darf, type AppEnv } from "../auth.js";
 import { pfadId } from "../pfad.js";
 import { EingabeFehler } from "../fehler.js";
-import { buche, bucheMehrere, historie, korrigiere, offeneAusgaben } from "../../data/buchungen.js";
+import { buche, bucheMehrere, bucheRuecknahmeDefekt, historie, korrigiere, offeneAusgaben } from "../../data/buchungen.js";
+import { findeSchaden } from "../../data/schaeden.js";
 import { findeGeraet } from "../../data/geraete.js";
 
 export const buchungsRouten = new Hono<AppEnv>();
@@ -90,6 +91,42 @@ const korrekturSchema = z.object({
   // Pflicht. Eine Berichtigung ohne Begründung ist in einem halben Jahr
   // nicht mehr nachvollziehbar.
   begruendung: z.string().min(3).max(2000),
+});
+
+/**
+ * Rücknahme mit Ausfallschaden — beides in einer Transaktion.
+ *
+ * Schließt die Lücke, in der das Gerät nach der Rücknahme kurz `verfuegbar`
+ * war und theoretisch erneut ausgegeben werden konnte.
+ */
+const ruecknahmeDefektSchema = z.object({
+  geraet_id: z.string().uuid(),
+  nach_standort_id: z.string().uuid().nullish(),
+  nach_lagerplatz_id: z.string().uuid().nullish(),
+  notiz: z.string().max(2000).nullish(),
+  beschreibung: z.string().max(4000).optional(),
+});
+
+buchungsRouten.post("/buchungen/ruecknahme-defekt", darf("buchungen.erfassen"), async (c) => {
+  const daten = await gelesen(c, ruecknahmeDefektSchema);
+  const benutzer = angemeldet(c);
+
+  const { buchungId, schadenId } = await bucheRuecknahmeDefekt(
+    {
+      geraet_id: daten.geraet_id,
+      nach_standort_id: daten.nach_standort_id,
+      nach_lagerplatz_id: daten.nach_lagerplatz_id,
+      notiz: daten.notiz,
+      beschreibung: daten.beschreibung ?? "Bei der Rücknahme als defekt gemeldet.",
+    },
+    benutzer.id,
+  );
+
+  const [geraet, schaden] = await Promise.all([
+    findeGeraet(daten.geraet_id),
+    findeSchaden(schadenId),
+  ]);
+  return c.json({ buchung_id: buchungId, schaden, geraet }, 201);
 });
 
 buchungsRouten.post("/buchungen/korrektur", darf("buchungen.korrigieren"), async (c) => {

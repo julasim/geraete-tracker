@@ -48,7 +48,7 @@
  */
 import { computed, onMounted, ref } from "vue";
 import { api } from "@/api";
-import { meldeDefekt, sendeEinzelbuchung, sendeSammelbuchung, type Buchungsangaben } from "@/buchen";
+import { meldeDefekt, sendeEinzelbuchung, sendeRuecknahmeDefekt, sendeSammelbuchung, type Buchungsangaben } from "@/buchen";
 import { meldungAus } from "@/meldung";
 import { useBreite } from "@/composables/useBreite";
 import { useBuchungsziel } from "@/composables/useBuchungsziel";
@@ -288,22 +288,17 @@ async function buchen(): Promise<void> {
   };
 
   try {
-    let eigene: Buchung;
+    let eigene: Buchung | null = null;
 
-    if (zubehoerGewaehlt.value.length) {
-      // Geht Zubehör mit, ist es fachlich eine Sammelbuchung — dieselbe
-      // Transaktion, dieselbe Alles-oder-nichts-Regel.
+    if (istRuecknahme.value && ausfall.value && !zubehoerGewaehlt.value.length) {
+      const antwort = await sendeRuecknahmeDefekt(props.geraet.id, angaben, notiz.value);
+      bestand.ersetze(antwort.geraet);
+    } else if (zubehoerGewaehlt.value.length) {
       const sammel = await sendeSammelbuchung(
         [props.geraet.id, ...zubehoerGewaehlt.value],
         angaben,
       );
       for (const g of sammel.geraete) bestand.ersetze(g);
-
-      // Die Buchung DIESES Geräts heraussuchen, nicht die erste: Der Server
-      // sortiert nach Id, das Foto hinge sonst womöglich am Löffel statt am
-      // Bagger. Fehlt sie, wird hier geworfen — anders als in `BuchenView`,
-      // die still überspringt. Beides ist vertretbar; hier bleibt der Dialog
-      // ohnehin stehen und kann die Meldung zeigen.
       const treffer = sammel.buchungen.find((b) => b.geraet_id === props.geraet.id);
       if (!treffer) throw new Error("Buchung fehlgeschlagen");
       eigene = treffer;
@@ -314,23 +309,18 @@ async function buchen(): Promise<void> {
     }
 
     merke();
-    gebuchte.value = eigene;
+    if (eigene) gebuchte.value = eigene;
 
-    // Das Foto NACH der Buchung: Es hängt an ihr, also muss sie zuerst
-    // existieren. Scheitert der Upload, ist die Buchung trotzdem gültig —
-    // ein Bild ist eine Beigabe, der Bestand ist die Hauptsache.
-    if (fotoDatei.value && eigene.id) await fotoHochladen(eigene.id);
+    if (fotoDatei.value && eigene?.id) await fotoHochladen(eigene.id);
 
-    if (istRuecknahme.value && ausfall.value) await defektNachtragen(eigene.id);
+    // Sammelweg mit Defekt: zwei Aufrufe (Zubehör darf nicht mitgesperrt werden).
+    if (istRuecknahme.value && ausfall.value && zubehoerGewaehlt.value.length && eigene) {
+      await defektNachtragen(eigene.id);
+    }
 
-    // Solange eine Warnung ungelesen ist, bleibt der Dialog stehen: Sonst
-    // verschwände er, und niemand erführe, dass Foto oder Defektmeldung nicht
-    // durchgingen. Genau das ist am Handy schon einmal passiert (AP22).
-    // Nur ein gescheiterter Upload hält den Dialog offen, nicht eine
-    // gescheiterte Bildvorbereitung: Die kostet nichts und wäre kein Grund,
-    // den Benutzer nach einer geglückten Buchung ein zweites Mal klicken zu
-    // lassen.
-    if (!uebertragungFehlt.value && !defektWarnung.value) emit("gebucht", eigene);
+    if (!uebertragungFehlt.value && !defektWarnung.value) {
+      emit("gebucht", eigene ?? ({} as Buchung));
+    }
   } catch (f) {
     fehler.value = meldungAus(f, "Buchung fehlgeschlagen");
   } finally {

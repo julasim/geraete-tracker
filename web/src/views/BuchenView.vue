@@ -15,7 +15,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { api } from "@/api";
-import { meldeDefekt, sendeEinzelbuchung, sendeSammelbuchung, type Buchungsangaben } from "@/buchen";
+import { meldeDefekt, sendeEinzelbuchung, sendeRuecknahmeDefekt, sendeSammelbuchung, type Buchungsangaben } from "@/buchen";
 import { meldungAus } from "@/meldung";
 import { useAnmeldung } from "@/stores/anmeldung";
 import { useBestand } from "@/stores/bestand";
@@ -169,18 +169,15 @@ async function buchen(): Promise<void> {
   try {
     let eigene: { id: string } | null = null;
 
-    if (zubehoerGewaehlt.value.length) {
+    if (istRuecknahme.value && ausfall.value && !zubehoerGewaehlt.value.length) {
+      const antwort = await sendeRuecknahmeDefekt(geraetId, angaben, notiz.value);
+      bestand.ersetze(antwort.geraet);
+      geraet.value = antwort.geraet;
+    } else if (zubehoerGewaehlt.value.length) {
       const sammel = await sendeSammelbuchung([geraetId, ...zubehoerGewaehlt.value], angaben);
       for (const g of sammel.geraete) bestand.ersetze(g);
       const eigenes = sammel.geraete.find((g) => g.id === geraetId);
       if (eigenes) geraet.value = eigenes;
-
-      // Die Buchung DIESES Geräts heraussuchen, nicht die erste: Der Server
-      // sortiert nach Id, das Foto hinge sonst womöglich am Löffel statt am
-      // Bagger. Fehlt sie in der Antwort, wird hier still übersprungen —
-      // anders als im Dialog, der wirft. Beides ist vertretbar: Hier steht
-      // die Bestätigungsseite unmittelbar bevor, dort bleibt der Dialog
-      // stehen und kann die Warnung noch zeigen.
       eigene = sammel.buchungen.find((b) => b.geraet_id === geraetId) ?? null;
     } else {
       const antwort = await sendeEinzelbuchung(geraetId, angaben);
@@ -191,12 +188,13 @@ async function buchen(): Promise<void> {
 
     merke();
 
-    // Das Foto NACH der Buchung: Es hängt an ihr, also muss sie zuerst
-    // existieren. Scheitert der Upload, ist die Buchung trotzdem gültig —
-    // ein Bild ist eine Beigabe, der Bestand ist die Hauptsache.
     if (fotoDatei.value && eigene?.id) await fotoHochladen(eigene.id);
 
-    if (istRuecknahme.value && ausfall.value) await defektNachtragen(eigene?.id ?? null);
+    // Sammelweg mit Defekt: weiterhin zwei Aufrufe (das Zubehör darf nicht
+    // mitgesperrt werden). Einzelweg läuft über die transaktionale Route.
+    if (istRuecknahme.value && ausfall.value && zubehoerGewaehlt.value.length) {
+      await defektNachtragen(eigene?.id ?? null);
+    }
 
     fertig.value = true;
   } catch (f) {

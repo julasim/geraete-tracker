@@ -106,28 +106,31 @@ export function sendeSammelbuchung(
  * gar nicht erst.
  */
 /**
- * Ein Gerät kommt kaputt zurück.
+ * Rücknahme mit Ausfallschaden in EINER Transaktion — der Einzelfall.
  *
- * Warum als **Schadensmeldung** und nicht als `ausfall` an der Buchung:
- * Ein per Buchung gesperrtes Gerät hat keinen Schadensdatensatz — die
- * Automatik „letzten Schaden erledigt → wieder verfügbar" greift dann nicht,
- * und nur jemand mit `buchungen.korrigieren` bekommt es wieder frei. Über
- * den Schaden geht es den normalen Weg. Beim Sammelweg kommt hinzu, dass
- * `bucheMehrere` den Rumpf unverändert an JEDES Gerät weiterreicht: Ein
- * `ausfall` darin sperrte den Löffel mit dem Bagger.
- *
- * **Der Preis, bewusst bezahlt:** Früher lief das Sperren in derselben
- * Transaktion wie die Buchung, unter `FOR UPDATE`. Jetzt sind es zwei
- * Aufrufe, und dazwischen steht das Gerät kurz auf `verfuegbar`. Gibt es in
- * diesem Fenster ein anderer aus, greift die Regel in
- * `src/data/schaeden.ts` nicht mehr (sie sperrt nur, was nicht ausgegeben
- * ist) — der Schaden wird angelegt, das Gerät bleibt draußen und weiter
- * ausgebbar. Das Fenster ist zwei HTTP-Aufrufe breit und braucht zwei
- * Benutzer am selben Gerät im selben Moment; bei fünf bis zehn Benutzern und
- * 200 Maschinen ist das unwahrscheinlich, aber nicht unmöglich. Wer es
- * schließen will, braucht eine Serverroute, die Rücknahme und Ausfallschaden
- * in einer Transaktion erledigt — ein eigenes Arbeitspaket, keine
- * Nachbesserung hier.
+ * Schließt die Lücke, in der das Gerät zwischen Rücknahme und
+ * Schadensmeldung kurz `verfuegbar` war.
+ */
+export function sendeRuecknahmeDefekt(
+  geraetId: string,
+  angaben: Buchungsangaben,
+  defektNotiz: string,
+): Promise<{ geraet: Geraet }> {
+  const vermerk = defektNotiz.trim();
+  return api.post<{ geraet: Geraet }>("/buchungen/ruecknahme-defekt", {
+    geraet_id: geraetId,
+    nach_standort_id: angaben.standortId || null,
+    nach_lagerplatz_id: angaben.lagerplatzId || null,
+    notiz: angaben.notiz || null,
+    beschreibung: vermerk
+      ? `Bei der Rücknahme als defekt gemeldet: ${vermerk}`
+      : "Bei der Rücknahme als defekt gemeldet.",
+  });
+}
+
+/**
+ * Defekt nachtragen — der Sammelfall (mit Zubehör), wo die Buchung bereits
+ * über `bucheMehrere` gelaufen ist und die Schadensmeldung separat folgt.
  */
 export function meldeDefekt(
   geraetId: string,
@@ -140,8 +143,6 @@ export function meldeDefekt(
       ? `Bei der Rücknahme als defekt gemeldet: ${vermerk}`
       : "Bei der Rücknahme als defekt gemeldet.",
     schwere: "ausfall",
-    // Der Schaden hängt an der Rücknahme, mit der er auffiel — sonst steht
-    // später eine Meldung ohne Vorgang da.
     buchung_id: buchungId,
   });
 }

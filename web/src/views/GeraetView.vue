@@ -41,6 +41,7 @@ import {
   type Buchungsart,
   type Datei,
   type Geraet,
+  type Pruefart,
   type Pruefung,
   type Schaden,
 } from "@/typen";
@@ -204,25 +205,20 @@ async function nachDerBuchung(): Promise<void> {
 async function laden(): Promise<void> {
   try {
     const aktuelleId = id.value;
-    const [g, d, h, p, s] = await Promise.all([
-      api.get<Geraet>(`/geraete/${aktuelleId}`),
+    const [gMitAktionen, d, h, p, s] = await Promise.all([
+      api.get<Geraet & { aktionen: Aktion[] }>(`/geraete/${aktuelleId}`),
       api.get<Datei[]>(`/geraete/${aktuelleId}/dateien`),
       api.get<Buchung[]>(`/geraete/${aktuelleId}/historie`),
       api.get<Pruefung[]>(`/geraete/${aktuelleId}/pruefungen`),
       api.get<Schaden[]>(`/geraete/${aktuelleId}/schaeden`),
     ]);
+    const { aktionen: serverAktionen, ...g } = gMitAktionen;
     geraet.value = g;
     dateien.value = d;
     historie.value = h;
     pruefungen.value = p;
     schaeden.value = s;
-
-    // Welche Buchungen erlaubt sind, sagt der Server — dieselbe Quelle wie
-    // beim Scannen, damit Anzeige und Regelwerk nicht auseinanderlaufen.
-    const gescannt = await api
-      .get<{ aktionen: Aktion[] }>(`/scan/${g.inventarnummer ?? ""}`)
-      .catch(() => null);
-    aktionen.value = gescannt?.aktionen ?? [];
+    aktionen.value = serverAktionen;
   } catch (f) {
     fehler.value = f instanceof ApiError ? f.message : "Konnte nicht laden";
   } finally {
@@ -262,6 +258,47 @@ async function schadenErledigen(schaden: Schaden): Promise<void> {
   geraet.value = antwort.geraet;
   bestand.ersetze(antwort.geraet);
   await laden();
+}
+
+// ── Prüfung eintragen ─────────────────────────────────────────────────────
+const pruefungOffen = ref(false);
+const pruefarten = ref<Pruefart[]>([]);
+const pruefartId = ref("");
+const geprueftAm = ref(new Date().toISOString().slice(0, 10));
+const pruefErgebnis = ref<"bestanden" | "maengel" | "durchgefallen">("bestanden");
+const pruefer = ref("");
+const pruefNotiz = ref("");
+const pruefLaeuft = ref(false);
+
+async function pruefFormularOeffnen(): Promise<void> {
+  pruefungOffen.value = true;
+  if (!pruefarten.value.length) {
+    pruefarten.value = await api.get<Pruefart[]>("/pruefarten").catch(() => []);
+  }
+}
+
+async function pruefungEintragen(): Promise<void> {
+  if (pruefLaeuft.value || !pruefartId.value) return;
+  pruefLaeuft.value = true;
+  try {
+    await api.post(`/geraete/${id.value}/pruefungen`, {
+      pruefart_id: pruefartId.value,
+      geprueft_am: geprueftAm.value,
+      ergebnis: pruefErgebnis.value,
+      pruefer: pruefer.value || null,
+      notiz: pruefNotiz.value || null,
+    });
+    pruefungOffen.value = false;
+    pruefartId.value = "";
+    pruefErgebnis.value = "bestanden";
+    pruefer.value = "";
+    pruefNotiz.value = "";
+    await laden();
+  } catch (f) {
+    fehler.value = f instanceof ApiError ? f.message : "Prüfung konnte nicht eingetragen werden";
+  } finally {
+    pruefLaeuft.value = false;
+  }
 }
 
 watch(id, () => {
@@ -497,9 +534,58 @@ onMounted(laden);
         </section>
 
         <!-- ── Prüfungen ─────────────────────────────────── -->
-        <section v-if="pruefungen.length">
-          <h2 class="pt-mikro abschnitt">Prüfungen</h2>
-          <ul class="pt-karte pt-liste">
+        <section>
+          <div class="abschnitt-kopf">
+            <h2 class="pt-mikro abschnitt">Prüfungen</h2>
+            <button
+              v-if="anmeldung.darf('pruefungen.eintragen')"
+              class="pt-btn pruef-eintragen-btn"
+              @click="pruefFormularOeffnen"
+            >
+              + Eintragen
+            </button>
+          </div>
+
+          <!-- Formular -->
+          <form v-if="pruefungOffen" class="pt-karte pruef-form" @submit.prevent="pruefungEintragen">
+            <label class="pruef-form__feld">
+              <span class="pruef-form__label">Prüfart</span>
+              <select v-model="pruefartId" required class="pt-feld">
+                <option value="" disabled>Bitte wählen</option>
+                <option v-for="a in pruefarten.filter(a => a.aktiv)" :key="a.id" :value="a.id">
+                  {{ a.name }} (alle {{ a.intervall_monate }} Mo.)
+                </option>
+              </select>
+            </label>
+            <label class="pruef-form__feld">
+              <span class="pruef-form__label">Geprüft am</span>
+              <input v-model="geprueftAm" type="date" required class="pt-feld" />
+            </label>
+            <label class="pruef-form__feld">
+              <span class="pruef-form__label">Ergebnis</span>
+              <select v-model="pruefErgebnis" class="pt-feld">
+                <option value="bestanden">Bestanden</option>
+                <option value="maengel">Mängel</option>
+                <option value="durchgefallen">Durchgefallen</option>
+              </select>
+            </label>
+            <label class="pruef-form__feld">
+              <span class="pruef-form__label">Prüfer (optional)</span>
+              <input v-model="pruefer" type="text" maxlength="120" class="pt-feld" />
+            </label>
+            <label class="pruef-form__feld">
+              <span class="pruef-form__label">Notiz (optional)</span>
+              <textarea v-model="pruefNotiz" rows="2" maxlength="2000" class="pt-feld"></textarea>
+            </label>
+            <div class="pruef-form__aktionen">
+              <button type="submit" class="pt-btn pt-btn--primaer" :disabled="pruefLaeuft || !pruefartId">
+                {{ pruefLaeuft ? "Wird gespeichert …" : "Speichern" }}
+              </button>
+              <button type="button" class="pt-btn" @click="pruefungOffen = false">Abbrechen</button>
+            </div>
+          </form>
+
+          <ul v-if="pruefungen.length" class="pt-karte pt-liste">
             <li v-for="p in pruefungen.slice(0, 5)" :key="p.id">
               <div class="pt-zeile">
                 <div class="pt-zeile__haupt">
@@ -527,6 +613,7 @@ onMounted(laden);
               </div>
             </li>
           </ul>
+          <p v-else-if="!pruefungOffen" class="pt-leer">Noch keine Prüfung eingetragen.</p>
         </section>
 
         <!-- ── Schäden ───────────────────────────────────── -->
@@ -850,11 +937,57 @@ onMounted(laden);
             </template>
           </dl>
 
-          <section v-if="pruefungen.length" class="pt-karte">
+          <section class="pt-karte">
             <div class="kartenkopf">
               <h2 class="kartentitel">Prüfungen</h2>
+              <button
+                v-if="anmeldung.darf('pruefungen.eintragen')"
+                class="pt-btn pruef-eintragen-btn"
+                @click="pruefFormularOeffnen"
+              >
+                + Eintragen
+              </button>
             </div>
-            <ul class="pt-liste">
+
+            <form v-if="pruefungOffen" class="pruef-form pruef-form--innen" @submit.prevent="pruefungEintragen">
+              <label class="pruef-form__feld">
+                <span class="pruef-form__label">Prüfart</span>
+                <select v-model="pruefartId" required class="pt-feld">
+                  <option value="" disabled>Bitte wählen</option>
+                  <option v-for="a in pruefarten.filter(a => a.aktiv)" :key="a.id" :value="a.id">
+                    {{ a.name }} (alle {{ a.intervall_monate }} Mo.)
+                  </option>
+                </select>
+              </label>
+              <label class="pruef-form__feld">
+                <span class="pruef-form__label">Geprüft am</span>
+                <input v-model="geprueftAm" type="date" required class="pt-feld" />
+              </label>
+              <label class="pruef-form__feld">
+                <span class="pruef-form__label">Ergebnis</span>
+                <select v-model="pruefErgebnis" class="pt-feld">
+                  <option value="bestanden">Bestanden</option>
+                  <option value="maengel">Mängel</option>
+                  <option value="durchgefallen">Durchgefallen</option>
+                </select>
+              </label>
+              <label class="pruef-form__feld">
+                <span class="pruef-form__label">Prüfer (optional)</span>
+                <input v-model="pruefer" type="text" maxlength="120" class="pt-feld" />
+              </label>
+              <label class="pruef-form__feld">
+                <span class="pruef-form__label">Notiz (optional)</span>
+                <textarea v-model="pruefNotiz" rows="2" maxlength="2000" class="pt-feld"></textarea>
+              </label>
+              <div class="pruef-form__aktionen">
+                <button type="submit" class="pt-btn pt-btn--primaer" :disabled="pruefLaeuft || !pruefartId">
+                  {{ pruefLaeuft ? "Wird gespeichert …" : "Speichern" }}
+                </button>
+                <button type="button" class="pt-btn" @click="pruefungOffen = false">Abbrechen</button>
+              </div>
+            </form>
+
+            <ul v-if="pruefungen.length" class="pt-liste">
               <li v-for="p in pruefungen" :key="p.id">
                 <div class="pt-zeile pt-zeile--still pruefzeile">
                   <div class="pt-zeile__haupt">
@@ -863,14 +996,13 @@ onMounted(laden);
                       geprüft {{ datum(p.geprueft_am) }} · nächste {{ datum(p.naechste_faellig) }}
                     </div>
                   </div>
-                  <!-- Restfrist in Worten, wie in der Fristenliste: „seit 12
-                       Tagen" liest sich im Bauhof schneller als ein Datum. -->
                   <span class="pt-chip" :class="ampelKlasse(ampelVon(p.naechste_faellig))">
                     {{ frist(tageBis(p.naechste_faellig)) }}
                   </span>
                 </div>
               </li>
             </ul>
+            <p v-else-if="!pruefungOffen" class="pt-leer pruef-leer">Noch keine Prüfung eingetragen.</p>
           </section>
         </div>
       </div>
@@ -1278,5 +1410,45 @@ onMounted(laden);
 
 .pruefzeile {
   padding: var(--space-3) var(--space-5);
+}
+.pruef-leer {
+  padding: var(--space-4) var(--space-5);
+}
+
+/* ── Prüfung-eintragen-Kopf ───────────────────────── */
+.abschnitt-kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ── Prüfungs-Formular ────────────────────────────── */
+.pruef-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+.pruef-form--innen {
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border);
+}
+.pruef-form__feld {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.pruef-form__label {
+  font-size: var(--fs-13);
+  color: var(--fg-muted);
+  font-weight: var(--fw-medium);
+}
+.pruef-form__aktionen {
+  display: flex;
+  gap: var(--space-2);
+}
+.pruef-eintragen-btn {
+  font-size: var(--fs-13);
+  padding: var(--space-1) var(--space-3);
 }
 </style>

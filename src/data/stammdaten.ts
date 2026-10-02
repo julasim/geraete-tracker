@@ -238,9 +238,16 @@ export async function pruefePlatzZuStandortInTx(
   lagerplatzId: string,
   standortId: string | null,
 ): Promise<void> {
-  const [platz] = await tx<{ standort_id: string }[]>`
-    SELECT standort_id FROM lagerplaetze WHERE id = ${lagerplatzId}`;
+  const [platz] = await tx<{ standort_id: string; aktiv: boolean }[]>`
+    SELECT standort_id, aktiv FROM lagerplaetze WHERE id = ${lagerplatzId}`;
   if (!platz) throw new NichtGefunden("Lagerplatz");
+
+  if (!platz.aktiv) {
+    throw new RegelFehler(
+      "Dieser Lagerplatz ist stillgelegt und kann nicht zugewiesen werden.",
+      "platz_stillgelegt",
+    );
+  }
 
   // Der Satz muss in zwei Lagen tragen: beim Anlegen hat der Benutzer den
   // Ort noch gar nicht gewählt, beim Buchen sehr wohl — dort hat nur das
