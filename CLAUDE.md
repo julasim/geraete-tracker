@@ -17,9 +17,9 @@ Bedienung der Benutzerverwaltung: [`docs/BEDIENUNG.md`](docs/BEDIENUNG.md).
 
 ## Loslegen
 
-> Einstieg für einen frischen Rechner: [`README.md`](README.md) — dort steht der
-> Installationsweg, der einmal von Null gegen eine leere Datenbank durchgespielt
-> wurde.
+> Einstieg für einen frischen Rechner: [`docs/INSTALLATION.md`](docs/INSTALLATION.md) —
+> dort steht der Installationsweg, der einmal von Null gegen eine leere Datenbank
+> durchgespielt wurde.
 
 ```bash
 npm ci                                            # Server UND web/ (postinstall)
@@ -27,7 +27,7 @@ wsl -d Ubuntu-24.04 -- docker start tracker-db   # Datenbank hoch
 npm run db:migrate                                # Schema aktuell halten
 npm run benutzer:anlegen -- --name <name> --rolle verwaltung
 npm run build && node dist/index.js               # läuft auf :3000
-npm test                                          # 391 Tests
+npm test                                          # 603 Tests (391 Server, 212 Oberfläche)
 node scripts/rauchtest.mjs <name> <passwort>      # Anmeldung, gegen die laufende App
 node scripts/durchlauf.mjs <name> <passwort>      # Büro-Weg: anlegen, etikettieren
 node scripts/durchlauf-buchen.mjs <name> <pw>     # Baustellen-Weg: scannen, buchen

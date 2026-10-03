@@ -50,6 +50,18 @@ Sie wieder dort, wo Sie waren. **Escape** oder ein Klick daneben bricht ab.
 Am Handy bleibt es bei der eigenen Seite mit Bestätigung — dort ist für ein
 Fenster kein Platz.
 
+## Das Gerätedetail am Computer
+
+Am Computer zeigt das Gerätedetail eine eigene Kopfleiste (Nummer, Zustand,
+Buchungsknöpfe) statt der Handy-Kopfzeile. Der **Verlauf ist sofort offen** —
+am Handy bleibt er eingeklappt, damit der Standort zuerst kommt. Fällige
+Prüfungen stehen als **Restfrist in Worten** da („seit 12 Tagen", „in 31
+Tagen"), damit man nicht erst den Kalender befragen muss.
+
+Welche Buchungen angeboten werden, entscheidet der Server — ein verfügbares
+Gerät zeigt „Ausgeben", ein ausgegebenes „Zurücknehmen". Knöpfe für
+Stammdaten und Schadensmeldung hängen am jeweiligen Recht.
+
 ---
 
 # Was ist fällig?
@@ -343,6 +355,22 @@ Ohne diesen Vorschlag stünde der Löffel weiter im Lager, während er in
 Wahrheit auf der Baustelle liegt — und der Bestand wäre falsch.
 
 *Zubehör wird am Gerät hinterlegt: Gerät öffnen → Bearbeiten → „Gehört zu".*
+
+## Defekt bei der Rücknahme
+
+Kommt ein Gerät kaputt zurück, haken Sie beim Zurücknehmen **„Gerät ist defekt"**
+an. Die Anwendung bucht die Rücknahme und meldet den Schaden in einem Schritt
+(ohne Zubehör als eine Transaktion; mit Zubehör als Sammelbuchung + Meldung).
+Das Gerät steht danach auf **defekt** und kann nicht wieder ausgegeben werden,
+bis der Schaden erledigt ist.
+
+Der Schalter erscheint nur, wenn Sie das Recht *Schäden melden* haben.
+
+## Prüfung eintragen
+
+Gerät öffnen → **Prüfung eintragen**. Prüfart wählen, Datum und Ergebnis
+angeben — die nächste Fälligkeit rechnet die Anwendung aus dem Intervall der
+Prüfart selbst aus. Braucht das Recht *Prüfungen eintragen*.
 
 ## Pakete
 

@@ -1,6 +1,7 @@
 # Geräte-Tracker — Web-Anwendung für Baustellengeräte mit Barcode
 
-Stand 2026-08-16. **Bewusst klein gehalten:** ~200 Maschinen, eine Handvoll Mitarbeiter.
+Stand 2026-08-16 (Plan); aktueller Projektstand 2026-10-03.
+**Bewusst klein gehalten:** ~200 Maschinen, eine Handvoll Mitarbeiter.
 
 > **Dieser Plan ist das Dokument von vor dem Bau.** Er ist an drei Stellen von
 > der Umsetzung überholt worden; wo das der Fall ist, steht es im Text. Der
@@ -15,10 +16,27 @@ Stand 2026-08-16. **Bewusst klein gehalten:** ~200 Maschinen, eine Handvoll Mita
 >    Anwendung bleibt und war ohnehin die tragende Schicht.
 > 2. **AP10 ist die Benutzerverwaltung geworden**, nicht das Deployment. Der
 >    Betrieb kam als AP11, das Nummernregister als AP12, der Eingang als AP13.
->    Danach folgten noch AP14 (ESLint), AP15 (Fristenliste, Health-Check),
->    AP16 (Prüfkette bei jedem Push, sichtbarer Sicherungsstand) und AP17
->    (Abnahme des ganzen Pakets) — der Plan kennt sie nicht, weil sie sich
->    erst aus dem Gebauten ergaben.
+>    Danach folgten AP14 (ESLint), AP15 (Fristenliste, Health-Check),
+>    AP16 (Prüfkette bei jedem Push, sichtbarer Sicherungsstand), AP17
+>    (Abnahme des ganzen Pakets), AP18 (Baustellen anlegen in der
+>    Oberfläche), AP19 (alle Stammdaten bedienbar + Oberflächenprüfung),
+>    AP20 (Handydurchsicht), AP21 (Frontend-Testumgebung, 212 Tests),
+>    AP22 (Zustandsfotos, „Derzeit draußen"), AP23 (Sammelbuchung, Pakete,
+>    Zubehör), AP24 (Desktop-UI — Seitenleiste, Tabelle, Dialoge, zwei
+>    Haltungen) und AP25 (Buchungsfachlichkeit entdoppelt, transaktionaler
+>    Defekt-Weg, Lagerplatz beim Anlegen, Rechteprüfungen).
+>    **603 Tests** (391 Server, 212 Oberfläche), **11 Migrationen**,
+>    **23 Schutzregeln am Schema**.
+> 4. **Das Rollensystem ist ausgebaut.** Der Plan sieht zwei feste Rollen
+>    vor (admin/mitarbeiter). Gebaut wurden **13 konfigurierbare Rechte** und
+>    **3 mitgelieferte Rollen** (Mitarbeiter, Lager und Werkstatt, Verwaltung)
+>    plus frei zusammenstellbare eigene Rollen.
+> 5. **Die API hat sich erweitert.** Hinzugekommen sind u. a.
+>    `POST /buchungen/sammel`, `POST /buchungen/ruecknahme-defekt`,
+>    `GET /etiketten/vorrat`, `GET /etiketten/lagerplaetze`,
+>    `/pakete`, `/import/paket/*`, `/geraete/:id/dateien`,
+>    `/geraete/:id/zubehoer`, `/bestand/draussen` und mehr.
+> 6. **Compose hat drei Dienste**, nicht vier — kein `cloudflared`.
 > 3. **Ein Nummernregister** war nicht vorgesehen. Ohne es hätte die Vergabe
 >    Nummern ausgegeben, die auf noch nicht erfassten Maschinen kleben.
 
@@ -85,7 +103,7 @@ Geerbt von `apps/patio` — bewusst identisch, damit Sie nichts Neues lernen mü
 | Auth | argon2id + JWT im **httpOnly-Cookie** | Kapitel 5 |
 | Frontend | Vue 3.5 `<script setup>`, Vite, Pinia, vue-router, Tailwind v4 | `apps/patio/web/` |
 | Tests | Vitest, `app.request()` gegen die echte Hono-App | `apps/patio/tests/` |
-| Betrieb | Docker Compose: postgres + app + caddy + cloudflared | Kapitel 10 |
+| Betrieb | Docker Compose: postgres + app + caddy | Kapitel 10 |
 
 **Drei bewusste Abweichungen von Patio:**
 
@@ -602,7 +620,7 @@ Alle Werte werden **einmal** in `src/config.ts` gelesen und als Konstanten expor
 
 ### Compose
 
-Vier Dienste in einem internen Bridge-Netz. **Weder `app` noch `postgres` haben `ports:`** — nur `expose`. `caddy` bindet ausschließlich an `127.0.0.1`, weil `cloudflared` lokal ansetzt. Volumes: `postgres_data`, `caddy_data`, Bind-Mount `${DATA_PATH}` für Fotos.
+~~Vier~~ **Drei** Dienste in einem internen Bridge-Netz (seit 2026-08-21 kein `cloudflared` mehr). **Weder `app` noch `postgres` haben `ports:`** — nur `expose`. `caddy` bindet Port 80/443. Volumes: `postgres_data`, `caddy_data`, Bind-Mount `${DATA_PATH}` für Fotos.
 
 **Stolperstein aus Ihrem Playbook:** Der Container läuft als `node` (uid 1000). Der Foto-Ordner braucht auf dem Host `chown -R 1000:1000`, sonst scheitern Uploads mit `EACCES` — möglicherweise leise.
 

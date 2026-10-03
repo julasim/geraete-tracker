@@ -401,4 +401,4 @@ Daten vernichtet.
 |---|---|
 | [`BETRIEB.md`](BETRIEB.md) | Betrieb im Alltag: Sicherung, Aktualisierung, Fehlersuche |
 | [`BEDIENUNG.md`](BEDIENUNG.md) | Die Anwendung benutzen: scannen, buchen, Etiketten, Benutzer, Rollen |
-| [`../README.md`](../README.md) | Entwicklung auf dem eigenen Rechner |
+| [`PLAN.md`](PLAN.md) | Ursprünglicher Entwurf mit Abweichungsnotizen |
