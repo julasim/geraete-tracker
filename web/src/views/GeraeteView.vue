@@ -67,9 +67,17 @@ const filter = ref<GeraetStatus | "alle">(
     : "alle",
 );
 
-/** Zwei Zusatzfilter, die es nur am Computer gibt. Am Handy bleiben sie leer. */
 const ortFilter = ref("");
 const schlagwortFilter = ref("");
+const herstellerFilter = ref("");
+
+const hersteller = computed(() => {
+  const namen = new Set<string>();
+  for (const g of bestand.geraete) {
+    if (g.hersteller) namen.add(g.hersteller);
+  }
+  return [...namen].sort((a, b) => a.localeCompare(b, "de"));
+});
 
 /** Alles außer dem Statusfilter — die Grundlage für Liste UND Zählwerte. */
 const gesucht = computed(() => {
@@ -79,6 +87,9 @@ const gesucht = computed(() => {
   }
   if (schlagwortFilter.value) {
     treffer = treffer.filter((g) => g.schlagworte.some((w) => w.id === schlagwortFilter.value));
+  }
+  if (herstellerFilter.value) {
+    treffer = treffer.filter((g) => g.hersteller === herstellerFilter.value);
   }
   return treffer;
 });
@@ -181,6 +192,25 @@ onMounted(() => void bestand.laden());
           >
             {{ f.text }}
           </button>
+        </div>
+
+        <div class="zusatzfilter">
+          <select v-model="ortFilter" class="pt-feld zusatzfilter__feld" aria-label="Ort">
+            <option value="">Ort: alle</option>
+            <option v-for="s in bestand.aktiveStandorte" :key="s.id" :value="s.id">
+              {{ s.name }}
+            </option>
+          </select>
+
+          <select v-if="bestand.schlagworte.length" v-model="schlagwortFilter" class="pt-feld zusatzfilter__feld" aria-label="Schlagwort">
+            <option value="">Schlagwort: alle</option>
+            <option v-for="w in bestand.schlagworte" :key="w.id" :value="w.id">{{ w.name }}</option>
+          </select>
+
+          <select v-if="hersteller.length" v-model="herstellerFilter" class="pt-feld zusatzfilter__feld" aria-label="Hersteller">
+            <option value="">Hersteller: alle</option>
+            <option v-for="h in hersteller" :key="h" :value="h">{{ h }}</option>
+          </select>
         </div>
       </div>
 
@@ -299,6 +329,11 @@ onMounted(() => void bestand.laden());
         <select v-model="schlagwortFilter" class="wahlfeld" aria-label="Schlagwort">
           <option value="">Schlagwort: alle</option>
           <option v-for="w in bestand.schlagworte" :key="w.id" :value="w.id">{{ w.name }}</option>
+        </select>
+
+        <select v-if="hersteller.length" v-model="herstellerFilter" class="wahlfeld" aria-label="Hersteller">
+          <option value="">Hersteller: alle</option>
+          <option v-for="h in hersteller" :key="h" :value="h">{{ h }}</option>
         </select>
       </div>
 
@@ -440,6 +475,23 @@ onMounted(() => void bestand.laden());
   color: var(--accent-fg);
   background: var(--accent);
   border-color: var(--accent);
+}
+
+.zusatzfilter {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.zusatzfilter::-webkit-scrollbar {
+  display: none;
+}
+.zusatzfilter__feld {
+  min-height: 44px;
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-13);
 }
 
 .neu {

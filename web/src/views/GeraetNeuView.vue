@@ -54,6 +54,9 @@ const modell = ref("");
 const seriennummer = ref("");
 const inventarnummer = ref((route.query.nummer as string) ?? "");
 const notiz = ref("");
+const anschaffungsdatum = ref("");
+const anschaffungswert = ref("");
+const betriebsstunden = ref("");
 const standortId = ref("");
 const lagerplatzId = ref("");
 const gewaehlteWorte = ref<string[]>([]);
@@ -120,6 +123,9 @@ async function anlegen(): Promise<boolean> {
       seriennummer: seriennummer.value.trim() || null,
       inventarnummer: inventarnummer.value.trim() || null,
       notiz: notiz.value.trim() || null,
+      anschaffungsdatum: anschaffungsdatum.value || null,
+      anschaffungswert: anschaffungswert.value ? Number(anschaffungswert.value) : null,
+      betriebsstunden: betriebsstunden.value ? Number(betriebsstunden.value) : null,
       standort_id: standortId.value || null,
       lagerplatz_id: lagerplatzId.value || null,
       schlagworte: gewaehlteWorte.value,
@@ -160,6 +166,9 @@ async function speichern(): Promise<void> {
   seriennummer.value = "";
   inventarnummer.value = "";
   notiz.value = "";
+  anschaffungsdatum.value = "";
+  anschaffungswert.value = "";
+  betriebsstunden.value = "";
   bezeichnungEl.value?.focus();
 }
 
@@ -244,6 +253,42 @@ function zuEtiketten(): void {
               Nur eintragen, wenn ein Etikett schon klebt.
             </p>
           </div>
+        </div>
+
+        <div class="paar">
+          <div class="feld">
+            <label class="pt-label" for="ad">Anschaffungsdatum</label>
+            <input id="ad" v-model="anschaffungsdatum" class="pt-feld" type="date" />
+          </div>
+          <div class="feld">
+            <label class="pt-label" for="aw">Anschaffungswert (€)</label>
+            <input
+              id="aw"
+              v-model="anschaffungswert"
+              class="pt-feld pt-mono"
+              type="number"
+              inputmode="decimal"
+              step="0.01"
+              min="0"
+              placeholder="0,00"
+            />
+          </div>
+        </div>
+
+        <div class="paar">
+          <div class="feld">
+            <label class="pt-label" for="bs">Betriebsstunden</label>
+            <input
+              id="bs"
+              v-model="betriebsstunden"
+              class="pt-feld pt-mono"
+              type="number"
+              inputmode="decimal"
+              step="0.1"
+              min="0"
+            />
+          </div>
+          <div class="feld" />
         </div>
 
         <!--
@@ -470,6 +515,39 @@ function zuEtiketten(): void {
             Leer lassen — der Server vergibt die nächste freie Nummer fortlaufend.
             Nur eintragen, wenn ein Etikett schon klebt.
           </p>
+        </div>
+
+        <div class="zwei">
+          <div class="feld">
+            <label class="pt-label" for="ad">Anschaffungsdatum</label>
+            <input id="ad" v-model="anschaffungsdatum" class="pt-feld" type="date" />
+          </div>
+          <div class="feld">
+            <label class="pt-label" for="aw">Anschaffungswert (€)</label>
+            <input
+              id="aw"
+              v-model="anschaffungswert"
+              class="pt-feld pt-mono"
+              type="number"
+              inputmode="decimal"
+              step="0.01"
+              min="0"
+              placeholder="0,00"
+            />
+          </div>
+        </div>
+
+        <div class="feld">
+          <label class="pt-label" for="bs">Betriebsstunden</label>
+          <input
+            id="bs"
+            v-model="betriebsstunden"
+            class="pt-feld pt-mono"
+            type="number"
+            inputmode="decimal"
+            step="0.1"
+            min="0"
+          />
         </div>
 
         <div class="feld">
