@@ -199,14 +199,13 @@ beforeEach(() => {
   api.get.mockReset();
   api.post.mockReset().mockImplementation(async (pfad: string) => {
     if (pfad === "/standorte") return neuerOrt;
+    if (pfad === "/buchungen/ruecknahme-defekt") {
+      return { buchung_id: "b-eigene", schaden: { id: "s-1" }, geraet: { ...geraet, status: "defekt" } };
+    }
     if (pfad.endsWith("/schaeden")) {
-      // Der Server gibt das Gerät mit zurück: Bei Schwere „ausfall" hat sich
-      // sein Zustand gerade geändert.
       return { schaden: { id: "s-1" }, geraet: { ...geraet, status: "defekt" } };
     }
     if (pfad === "/buchungen/sammel") {
-      // Der Server sortiert nach Id — die eigene Buchung steht hier bewusst
-      // NICHT vorn.
       return {
         geraete: [geraet],
         buchungen: [
@@ -436,25 +435,17 @@ describe("Rücknahme", () => {
 describe("Defekt bei der Rücknahme", () => {
   const schaedenPfad = "/geraete/g1/schaeden";
 
-  it("meldet einen Schaden statt eines Sperrflags an der Buchung", async () => {
+  it("bucht Rücknahme und Defekt in einer Transaktion", async () => {
     const { ansicht } = await baue({ art: "ruecknahme" });
     await ansicht.find(".buchschalter__feld").setValue(true);
     await knopf(ansicht, "Zurücknehmen")?.trigger("click");
     await ansicht.vm.$nextTick();
 
-    const [buchungsPfad, buchung] = api.post.mock.calls[0] as [string, { ausfall?: boolean }];
-    expect(buchungsPfad).toBe("/buchungen");
-    // Kein Sperrflag mehr: Es wäre bei Zubehör an jedes Gerät gegangen.
-    expect(buchung.ausfall).toBeUndefined();
-
-    const [pfad, schaden] = api.post.mock.calls[1] as [
-      string,
-      { schwere: string; beschreibung: string; buchung_id: string },
-    ];
-    expect(pfad).toBe(schaedenPfad);
-    expect(schaden.schwere).toBe("ausfall");
-    // Am Vorgang, mit dem er auffiel — sonst steht die Meldung ohne Bezug da.
-    expect(schaden.buchung_id).toBe("b-eigene");
+    // Ohne Zubehör geht alles in EINEM Aufruf — kein Zwischenzustand.
+    expect(api.post).toHaveBeenCalledOnce();
+    const [pfad, koerper] = api.post.mock.calls[0] as [string, { beschreibung: string }];
+    expect(pfad).toBe("/buchungen/ruecknahme-defekt");
+    expect(koerper.beschreibung).toContain("Bei der Rücknahme als defekt gemeldet");
     expect(ansicht.emitted("gebucht")).toHaveLength(1);
   });
 
@@ -465,8 +456,8 @@ describe("Defekt bei der Rücknahme", () => {
     await knopf(ansicht, "Zurücknehmen")?.trigger("click");
     await ansicht.vm.$nextTick();
 
-    const [, schaden] = api.post.mock.calls[1] as [string, { beschreibung: string }];
-    expect(schaden.beschreibung).toContain("Hydraulikschlauch gerissen");
+    const [, koerper] = api.post.mock.calls[0] as [string, { beschreibung: string }];
+    expect(koerper.beschreibung).toContain("Hydraulikschlauch gerissen");
   });
 
   it("meldet den Defekt auch, wenn Zubehör mitgeht — und nur für das Gerät", async () => {
@@ -491,6 +482,8 @@ describe("Defekt bei der Rücknahme", () => {
   });
 
   it("lässt die Buchung stehen, wenn die Schadensmeldung scheitert", async () => {
+    // Nur beim Sammelweg (MIT Zubehör) sind Buchung und Schadensmeldung zwei
+    // getrennte Aufrufe — der Einzelweg läuft transaktional.
     const { ApiError } = await import("@/api");
     const vorher = api.post.getMockImplementation()!;
     api.post.mockImplementation(async (pfad: string, koerper?: unknown) => {
@@ -498,11 +491,9 @@ describe("Defekt bei der Rücknahme", () => {
       return vorher(pfad, koerper);
     });
 
-    const { ansicht } = await baue({ art: "ruecknahme" });
+    const { ansicht } = await baue({ art: "ruecknahme", zubehoer: [wagenDraussen] });
     await ansicht.find(".buchschalter__feld").setValue(true);
     await knopf(ansicht, "Zurücknehmen")?.trigger("click");
-    // Zwei Schritte weit: Buchung, dann Schadensmeldung. Ein einzelnes
-    // `nextTick` sieht die Warnung noch nicht.
     await new Promise((f) => setTimeout(f, 0));
     await ansicht.vm.$nextTick();
 

@@ -130,16 +130,15 @@ async function baue(vorgaben: Vorgaben = {}) {
     if (pfad.endsWith("/historie")) return vorgaben.historie ?? [buchung];
     if (pfad.endsWith("/pruefungen")) return vorgaben.pruefungen ?? [];
     if (pfad.endsWith("/schaeden")) return [];
-    if (pfad.startsWith("/scan/")) {
-      if (vorgaben.scanAntwortet === false) throw new Error("kein Scan");
-      return {
-        aktionen: vorgaben.aktionen ?? [
-          { art: "ausgabe", text: "Ausgeben", hauptaktion: true },
-          { art: "umbuchung", text: "Umbuchen", hauptaktion: false },
-        ],
-      };
-    }
-    return geraet;
+    // GET /geraete/:id liefert aktionen seit AP25 direkt mit.
+    if (vorgaben.scanAntwortet === false) return geraet;
+    return {
+      ...geraet,
+      aktionen: vorgaben.aktionen ?? [
+        { art: "ausgabe", text: "Ausgeben", hauptaktion: true },
+        { art: "umbuchung", text: "Umbuchen", hauptaktion: false },
+      ],
+    };
   });
 
   const ansicht = mount(GeraetView, {

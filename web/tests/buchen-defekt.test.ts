@@ -114,6 +114,9 @@ describe("Defekt bei der Rücknahme", () => {
   beforeEach(() => {
     api.get.mockReset();
     api.post.mockReset().mockImplementation(async (pfad: string) => {
+      if (pfad === "/buchungen/ruecknahme-defekt") {
+        return { buchung_id: "b-eigene", schaden: { id: "s-1" }, geraet: { ...bagger, status: "defekt" } };
+      }
       if (pfad.endsWith("/schaeden")) {
         return { schaden: { id: "s-1" }, geraet: { ...bagger, status: "defekt" } };
       }
@@ -130,20 +133,15 @@ describe("Defekt bei der Rücknahme", () => {
     });
   });
 
-  it("meldet einen Schaden statt eines Sperrflags an der Buchung", async () => {
+  it("bucht Rücknahme und Defekt in einer Transaktion", async () => {
     const { ansicht } = await baue();
     await zurueckAnkreuzenUndBuchen(ansicht);
 
-    const [buchungsPfad, buchung] = api.post.mock.calls[0] as [string, { ausfall?: boolean }];
-    expect(buchungsPfad).toBe("/buchungen");
-    expect(buchung.ausfall).toBeUndefined();
-
-    const gemeldet = schaedenPfade();
-    expect(gemeldet).toHaveLength(1);
-    expect(gemeldet[0]![0]).toBe("/geraete/g1/schaeden");
-    const [, schaden] = api.post.mock.calls[1] as [string, { schwere: string; buchung_id: string }];
-    expect(schaden.schwere).toBe("ausfall");
-    expect(schaden.buchung_id).toBe("b-eigene");
+    // Ohne Zubehör geht alles in EINEM Aufruf.
+    expect(api.post).toHaveBeenCalledOnce();
+    const [pfad, koerper] = api.post.mock.calls[0] as [string, { beschreibung: string }];
+    expect(pfad).toBe("/buchungen/ruecknahme-defekt");
+    expect(koerper.beschreibung).toContain("Bei der Rücknahme als defekt gemeldet");
   });
 
   it("meldet den Defekt auch, wenn Zubehör mitgeht — und nur für das Gerät", async () => {
@@ -157,15 +155,16 @@ describe("Defekt bei der Rücknahme", () => {
     expect(gemeldet[0]![0]).toBe("/geraete/g1/schaeden");
   });
 
-  it("zeigt den Zustand aus der Schadensmeldung, nicht den der Buchung", async () => {
-    // Ohne das stünde auf der Bestätigungsseite „verfügbar" — obwohl der
-    // Benutzer das Gerät gerade als defekt gemeldet hat.
+  it("zeigt den Zustand aus der transaktionalen Antwort", async () => {
+    // Die transaktionale Route liefert das Gerät direkt mit status „defekt".
     const { ansicht, bestand } = await baue();
     await zurueckAnkreuzenUndBuchen(ansicht);
     expect(bestand.geraete[0]!.status).toBe("defekt");
   });
 
   it("lässt die Buchung stehen, wenn die Schadensmeldung scheitert", async () => {
+    // Nur beim Sammelweg (MIT Zubehör) sind Buchung und Schadensmeldung zwei
+    // getrennte Aufrufe — der Einzelweg läuft transaktional.
     const { ApiError } = await import("@/api");
     const vorher = api.post.getMockImplementation()!;
     api.post.mockImplementation(async (pfad: string, koerper?: unknown) => {
@@ -173,7 +172,7 @@ describe("Defekt bei der Rücknahme", () => {
       return vorher(pfad, koerper);
     });
 
-    const { ansicht } = await baue();
+    const { ansicht } = await baue({ zubehoer: [loeffel] });
     await zurueckAnkreuzenUndBuchen(ansicht);
 
     // Die Rücknahme steht — die Bestätigungsseite ist da …
