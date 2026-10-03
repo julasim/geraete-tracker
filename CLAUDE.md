@@ -1414,36 +1414,21 @@ HTTPS-Adresse, steht also erst nach dem ersten Aufsetzen an. Protokoll:
 Danach: Bestand erfassen (Import oder einzeln), Etiketten für Geräte ohne
 Aufkleber drucken.
 
-**Die drei Entscheidungen aus AP24 sind erledigt** (siehe AP25). Offen
-geblieben ist, was dabei am Rand aufgefallen ist — nichts davon dringend:
+**Die drei Entscheidungen aus AP24 sind erledigt** (siehe AP25). Die fünf
+Randpunkte am Ende von AP25 sind inzwischen ebenfalls erledigt:
 
-1. **`POST /geraete/:id/pruefungen` hat keine Bedienung.** Prüfarten lassen
-   sich anlegen, eine *durchgeführte* Prüfung kann niemand eintragen. Das
-   Recht `pruefungen.eintragen` ist damit zur Hälfte unbenutzbar, und die
-   Fristenliste aus AP15 füllt sich nie. Das Prüfskript meldet es nicht,
-   weil `wirdBedient()` Aufrufpfade am `${` abschneidet und
-   `/api/geraete/:id/pruefungen` dadurch mit `/api/geraete/:id/schaeden`
-   zusammenfällt.
-2. **Der Defekt-Weg ist nicht mehr transaktional.** Rücknahme und
-   Ausfallschaden sind zwei Aufrufe; dazwischen steht das Gerät kurz auf
-   `verfuegbar`. Wer das schließen will, braucht eine Serverroute, die
-   beides in einer Transaktion erledigt. Begründung im Kommentar von
-   `meldeDefekt` (`web/src/buchen.ts`).
-3. **`pruefePlatzZuStandortInTx` prüft `lagerplaetze.aktiv` nicht.** Ein
-   stillgelegtes Regal lässt sich über die API weiterhin zuweisen (über die
-   Oberfläche nicht — der Store filtert). War vorher schon so. Entweder
-   `aktiv` aufnehmen oder bewusst offenlassen — ein Gerät steht ja womöglich
-   wirklich noch dort.
-4. **`zubehoerVonMehreren()` in `src/data/pakete.ts` hat keinen Aufrufer.**
-   Sie holt das Zubehör mehrerer Geräte in einer Abfrage, inklusive der
-   Regel „ein Gerät, das selbst in der Liste steht, nicht doppelt anbieten" —
-   die `useZubehoerwahl` im Frontend nachbaut. Entweder bekommt sie eine
-   Route, oder sie gehört gelöscht.
-5. **Das Prüfskript sieht nur statische `class="…"`** und keine
-   `:class`-Bindungen; und es findet die Fehlerart „Knopf ohne Recht" gar
-   nicht. Eine Stufe darüber wäre baubar (Routen-Rechte-Tabelle gegen die
-   Ansichten), erwischt aber nur die halben Fälle, solange die
-   Pfad-Extraktion `${…}` abschneidet statt als Platzhalter zu behandeln.
+1. ~~`POST /geraete/:id/pruefungen` hat keine Bedienung~~ — **erledigt:**
+   Formular „+ Eintragen" in `GeraetView.vue` (Zeilen 263–301, 536–586),
+   geschützt mit `pruefungen.eintragen`.
+2. ~~Der Defekt-Weg ist nicht mehr transaktional~~ — **erledigt:**
+   `POST /buchungen/ruecknahme-defekt` (Commit `2b4dc80`).
+3. ~~`pruefePlatzZuStandortInTx` prüft `lagerplaetze.aktiv` nicht~~ —
+   **erledigt:** Die Funktion prüft `aktiv` und wirft `RegelFehler`
+   (`src/data/stammdaten.ts`, Zeile 245).
+4. ~~`zubehoerVonMehreren()` ohne Aufrufer~~ — **erledigt:** Funktion
+   existiert nicht mehr (bereits gelöscht).
+5. ~~Das Prüfskript sieht nur statische `class="…"`~~ — **erledigt:**
+   Dynamische `:class`-Bindungen werden seit Commit `8174012` geprüft.
 
 ## Konventionen
 
