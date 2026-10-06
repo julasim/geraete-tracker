@@ -31,4 +31,5 @@ export type SymbolName =
   | "drucken"
   | "hoch"
   | "runter"
-  | "board";
+  | "board"
+  | "logbuch";

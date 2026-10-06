@@ -17,6 +17,7 @@ import { EingabeFehler } from "../fehler.js";
 import { buche, bucheMehrere, bucheRuecknahmeDefekt, historie, korrigiere, offeneAusgaben } from "../../data/buchungen.js";
 import { findeSchaden } from "../../data/schaeden.js";
 import { findeGeraet } from "../../data/geraete.js";
+import { protokolliere } from "../../data/logbuch.js";
 
 export const buchungsRouten = new Hono<AppEnv>();
 
@@ -66,6 +67,12 @@ buchungsRouten.post("/buchungen/sammel", darf("buchungen.erfassen"), async (c) =
   const benutzer = angemeldet(c);
 
   const buchungen = await bucheMehrere(geraet_ids, daten, benutzer.id);
+  await protokolliere({
+    benutzer_id: benutzer.id,
+    aktion: "sammelgebucht",
+    bereich: "buchung",
+    details: { art: daten.art, anzahl: geraet_ids.length },
+  });
   // Die Geräte kommen mit zurück — wie bei der Einzelbuchung zeigt die
   // Oberfläche danach den neuen Zustand ohne zweiten Aufruf.
   const geraete = await Promise.all(buchungen.map((b) => findeGeraet(b.geraet_id)));
@@ -77,6 +84,12 @@ buchungsRouten.post("/buchungen", darf("buchungen.erfassen"), async (c) => {
   const benutzer = angemeldet(c);
 
   const buchung = await buche(daten, benutzer.id);
+  await protokolliere({
+    benutzer_id: benutzer.id,
+    aktion: "gebucht",
+    bereich: "buchung",
+    details: { art: daten.art, geraet_id: daten.geraet_id },
+  });
   // Das Gerät kommt mit zurück: Die Oberfläche zeigt danach die
   // Bestätigungsseite mit dem neuen Zustand, ohne zweiten Aufruf.
   return c.json({ buchung, geraet: await findeGeraet(daten.geraet_id) }, 201);
@@ -122,6 +135,12 @@ buchungsRouten.post("/buchungen/ruecknahme-defekt", darf("buchungen.erfassen"), 
     benutzer.id,
   );
 
+  await protokolliere({
+    benutzer_id: benutzer.id,
+    aktion: "ruecknahme_defekt",
+    bereich: "buchung",
+    ziel_id: daten.geraet_id,
+  });
   const [geraet, schaden] = await Promise.all([
     findeGeraet(daten.geraet_id),
     findeSchaden(schadenId),
@@ -133,6 +152,12 @@ buchungsRouten.post("/buchungen/korrektur", darf("buchungen.korrigieren"), async
   const daten = await gelesen(c, korrekturSchema);
   const benutzer = angemeldet(c);
   const buchung = await korrigiere(daten, benutzer.id);
+  await protokolliere({
+    benutzer_id: benutzer.id,
+    aktion: "korrektur",
+    bereich: "buchung",
+    details: { neuer_status: daten.neuer_status, begruendung: daten.begruendung },
+  });
   return c.json({ buchung, geraet: await findeGeraet(daten.geraet_id) }, 201);
 });
 

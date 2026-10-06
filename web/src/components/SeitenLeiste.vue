@@ -77,6 +77,7 @@ const GRUPPEN: { titel: string; eintraege: Eintrag[] }[] = [
       { pfad: "/austausch", text: "Import und Export", symbol: "austausch" },
       { pfad: "/stammdaten", text: "Schlagworte und Prüfarten", symbol: "einstellungen" },
       { pfad: "/benutzer", text: "Benutzer und Rollen", symbol: "benutzer" },
+      { pfad: "/logbuch", text: "Logbuch", symbol: "logbuch" },
     ],
   },
 ];

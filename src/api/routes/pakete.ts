@@ -20,6 +20,7 @@ import {
 } from "../../data/pakete.js";
 import { EingabeFehler } from "../fehler.js";
 import { pfadId } from "../pfad.js";
+import { protokolliere } from "../../data/logbuch.js";
 
 export const paketRouten = new Hono<AppEnv>();
 
@@ -63,12 +64,16 @@ paketRouten.get("/pakete/:id/geraete", async (c) => {
 
 paketRouten.post("/pakete", darf("stammdaten.pflegen"), async (c) => {
   const daten = await gelesen(c, paketSchema);
-  return c.json(await legePaketAn(daten, angemeldet(c).id), 201);
+  const ergebnis = await legePaketAn(daten, angemeldet(c).id);
+  await protokolliere({ benutzer_id: angemeldet(c).id, aktion: "angelegt", bereich: "paket", ziel_id: ergebnis.id, ziel_text: ergebnis.name });
+  return c.json(ergebnis, 201);
 });
 
 paketRouten.patch("/pakete/:id", darf("stammdaten.pflegen"), async (c) => {
   const daten = await gelesen(c, paketSchema.partial().extend({ aktiv: z.boolean().optional() }));
-  return c.json(await aenderePaket(pfadId(c), daten, angemeldet(c).id));
+  const ergebnis = await aenderePaket(pfadId(c), daten, angemeldet(c).id);
+  await protokolliere({ benutzer_id: angemeldet(c).id, aktion: "geaendert", bereich: "paket", ziel_id: ergebnis.id, ziel_text: ergebnis.name });
+  return c.json(ergebnis);
 });
 
 /**
@@ -77,6 +82,8 @@ paketRouten.patch("/pakete/:id", darf("stammdaten.pflegen"), async (c) => {
  * keiner Historie auf; die Zuordnungen gehen per CASCADE mit.
  */
 paketRouten.delete("/pakete/:id", darf("stammdaten.pflegen"), async (c) => {
+  const akteur = angemeldet(c);
   await loeschePaket(pfadId(c));
+  await protokolliere({ benutzer_id: akteur.id, aktion: "geloescht", bereich: "paket", ziel_id: pfadId(c) });
   return c.body(null, 204);
 });

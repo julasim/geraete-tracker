@@ -69,6 +69,11 @@ const VERWALTUNG: Eintrag[] = [
     titel: "Benutzer und Rollen",
     unter: "Konten anlegen, Berechtigungen vergeben",
   },
+  {
+    pfad: "/logbuch",
+    titel: "Logbuch",
+    unter: "Alle Aktionen aller Benutzer nachverfolgen",
+  },
 ];
 
 const verwaltung = computed(() => VERWALTUNG.filter((e) => darfNach(e.pfad)));

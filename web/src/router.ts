@@ -124,6 +124,11 @@ export const router = createRouter({
       component: () => import("@/views/RollenView.vue"),
     },
     { path: "/passwort", name: "passwort", component: () => import("@/views/PasswortView.vue") },
+    {
+      path: "/logbuch",
+      name: "logbuch",
+      component: () => import("@/views/LogbuchView.vue"),
+    },
     { path: "/:pfad(.*)*", redirect: "/scan" },
   ],
   scrollBehavior: (_zu, _von, gemerkt) => gemerkt ?? { top: 0 },

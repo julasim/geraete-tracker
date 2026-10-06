@@ -22,6 +22,7 @@ import {
   reserviereNummern,
 } from "../../data/nummern.js";
 import { angemeldet } from "../auth.js";
+import { protokolliere } from "../../data/logbuch.js";
 
 export const etikettenRouten = new Hono<AppEnv>();
 
@@ -72,6 +73,8 @@ etikettenRouten.post("/etiketten/vorrat", darf("etiketten.drucken"), async (c) =
     },
   );
 
+  await protokolliere({ benutzer_id: akteur.id, aktion: "vorrat_reserviert", bereich: "etikett", details: { anzahl, von: nummern[0], bis: nummern[nummern.length - 1] } });
+
   c.header("Content-Type", "application/pdf");
   c.header("Content-Disposition", 'inline; filename="etiketten-vorrat.pdf"');
   c.header("Cache-Control", "no-store");
@@ -102,7 +105,9 @@ etikettenRouten.post("/etiketten/altbestand", darf("etiketten.drucken"), async (
   }
   const akteur = angemeldet(c);
   try {
-    return c.json(await merkeBereich(von, bis, akteur.id));
+    const ergebnis = await merkeBereich(von, bis, akteur.id);
+    await protokolliere({ benutzer_id: akteur.id, aktion: "altbestand_eingetragen", bereich: "etikett", details: { von, bis } });
+    return c.json(ergebnis);
   } catch (fehler) {
     throw new EingabeFehler(fehler instanceof Error ? fehler.message : "Bereich nicht lesbar.");
   }

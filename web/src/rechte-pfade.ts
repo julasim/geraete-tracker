@@ -51,6 +51,7 @@ export const RECHT_JE_PFAD: readonly Pfadrecht[] = [
   { muster: "/benutzer/:id", recht: "benutzer.verwalten" },
   { muster: "/benutzer", recht: "benutzer.verwalten" },
   { muster: "/rollen", recht: "benutzer.verwalten" },
+  { muster: "/logbuch", recht: "benutzer.verwalten" },
 ];
 
 /**

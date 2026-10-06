@@ -32,6 +32,7 @@ import { erlaubteAktionen } from "../../domain/status.js";
 import { EingabeFehler } from "../fehler.js";
 import { pfadId, pfadText } from "../pfad.js";
 import { hatRechtImKontext } from "../auth.js";
+import { protokolliere } from "../../data/logbuch.js";
 
 export const geraeteRouten = new Hono<AppEnv>();
 
@@ -108,7 +109,15 @@ const neuSchema = z.object({
 geraeteRouten.post("/geraete", darf("geraete.pflegen"), async (c) => {
   const daten = await gelesen(c, neuSchema);
   const benutzer = angemeldet(c);
-  return c.json(await legeGeraetAn(daten, benutzer.id), 201);
+  const geraet = await legeGeraetAn(daten, benutzer.id);
+  await protokolliere({
+    benutzer_id: benutzer.id,
+    aktion: "angelegt",
+    bereich: "geraet",
+    ziel_id: geraet.id,
+    ziel_text: geraet.bezeichnung,
+  });
+  return c.json(geraet, 201);
 });
 
 const aenderungSchema = z.object({
@@ -131,22 +140,56 @@ const aenderungSchema = z.object({
 geraeteRouten.patch("/geraete/:id", darf("geraete.pflegen"), async (c) => {
   const daten = await gelesen(c, aenderungSchema);
   const benutzer = angemeldet(c);
-  return c.json(await aendereGeraet(pfadId(c), daten, benutzer.id));
+  const geraet = await aendereGeraet(pfadId(c), daten, benutzer.id);
+  const { rev: _, ...felder } = daten;
+  await protokolliere({
+    benutzer_id: benutzer.id,
+    aktion: "geaendert",
+    bereich: "geraet",
+    ziel_id: geraet.id,
+    ziel_text: geraet.bezeichnung,
+    details: { geaenderte_felder: Object.keys(felder) },
+  });
+  return c.json(geraet);
 });
 
 geraeteRouten.post("/geraete/:id/ausmustern", darf("geraete.ausmustern"), async (c) => {
   const benutzer = angemeldet(c);
-  return c.json(await mustereAus(pfadId(c), benutzer.id));
+  const geraet = await mustereAus(pfadId(c), benutzer.id);
+  await protokolliere({
+    benutzer_id: benutzer.id,
+    aktion: "ausgemustert",
+    bereich: "geraet",
+    ziel_id: geraet.id,
+    ziel_text: geraet.bezeichnung,
+  });
+  return c.json(geraet);
 });
 
 geraeteRouten.post("/geraete/:id/barcodes", darf("geraete.pflegen"), async (c) => {
   const { barcode } = await gelesen(c, z.object({ barcode: z.string().min(1).max(40) }));
   const benutzer = angemeldet(c);
   const vergeben = await ergaenzeBarcode(pfadId(c), barcode, benutzer.id);
+  await protokolliere({
+    benutzer_id: benutzer.id,
+    aktion: "barcode_hinzugefuegt",
+    bereich: "geraet",
+    ziel_id: pfadId(c),
+    details: { barcode: vergeben },
+  });
   return c.json({ barcode: vergeben }, 201);
 });
 
 geraeteRouten.delete("/geraete/:id/barcodes/:code", darf("geraete.pflegen"), async (c) => {
-  await legeBarcodeStill(pfadId(c), pfadText(c, "code", 40));
+  const benutzer = angemeldet(c);
+  const code = pfadText(c, "code", 40);
+  await legeBarcodeStill(pfadId(c), code);
+  await protokolliere({
+    benutzer_id: benutzer.id,
+    aktion: "barcode_entfernt",
+    bereich: "geraet",
+    ziel_id: pfadId(c),
+    details: { barcode: code },
+  });
   return c.json({ ok: true });
 });

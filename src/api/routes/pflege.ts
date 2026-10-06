@@ -26,6 +26,7 @@ import {
   schaedenFuerGeraet,
 } from "../../data/schaeden.js";
 import { ampel } from "../../domain/pruefung.js";
+import { protokolliere } from "../../data/logbuch.js";
 
 export const pflegeRouten = new Hono<AppEnv>();
 
@@ -58,7 +59,10 @@ pflegeRouten.post("/pruefarten", darf("pruefungen.eintragen"), async (c) => {
       notiz: z.string().max(2000).nullish(),
     }),
   );
-  return c.json(await legePruefartAn(daten), 201);
+  const akteur = angemeldet(c);
+  const pruefart = await legePruefartAn(daten);
+  await protokolliere({ benutzer_id: akteur.id, aktion: "angelegt", bereich: "pruefart" });
+  return c.json(pruefart, 201);
 });
 
 // ── Prüfungen ──────────────────────────────────────────────────────────────
@@ -85,7 +89,9 @@ pflegeRouten.post("/geraete/:id/pruefungen", darf("pruefungen.eintragen"), async
     }),
   );
 
-  return c.json(await tragePruefungEin({ ...daten, geraet_id: id }, benutzer.id), 201);
+  const ergebnis = await tragePruefungEin({ ...daten, geraet_id: id }, benutzer.id);
+  await protokolliere({ benutzer_id: benutzer.id, aktion: "eingetragen", bereich: "pruefung", ziel_id: id });
+  return c.json(ergebnis, 201);
 });
 
 /** Die Ampelliste: was ist überfällig, was wird bald fällig. */
@@ -127,6 +133,7 @@ pflegeRouten.post("/geraete/:id/schaeden", darf("schaeden.melden"), async (c) =>
   const schaden = await meldeSchaden({ ...daten, geraet_id: id }, benutzer.id);
   // Das Gerät kommt mit: Bei "ausfall" hat sich sein Zustand gerade geändert,
   // und die Oberfläche soll das sofort zeigen können.
+  await protokolliere({ benutzer_id: benutzer.id, aktion: "gemeldet", bereich: "schaden", ziel_id: id });
   return c.json({ schaden, geraet: await findeGeraet(id) }, 201);
 });
 
@@ -142,5 +149,6 @@ pflegeRouten.patch("/schaeden/:id", darf("schaeden.bearbeiten"), async (c) => {
   );
 
   const schaden = await aendereSchaden(id, daten, benutzer.id);
+  await protokolliere({ benutzer_id: benutzer.id, aktion: "geaendert", bereich: "schaden", ziel_id: id, details: { status: daten.status } });
   return c.json({ schaden, geraet: await findeGeraet(schaden.geraet_id) });
 });

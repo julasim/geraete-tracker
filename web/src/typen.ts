@@ -281,6 +281,18 @@ export const STATUS_TEXT: Record<GeraetStatus, string> = {
   ausgemustert: "Ausgemustert",
 };
 
+export interface LogbuchZeile {
+  id: string;
+  zeitpunkt: string;
+  benutzer_id: string;
+  anzeigename: string;
+  aktion: string;
+  bereich: string;
+  ziel_id: string | null;
+  ziel_text: string | null;
+  details: Record<string, unknown> | null;
+}
+
 export interface SicherungsStand {
   ausgang: "erfolg" | "fehler";
   zeitpunkt: string;

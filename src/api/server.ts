@@ -39,6 +39,7 @@ import { paketRouten } from "./routes/pakete.js";
 import { pflegeRouten } from "./routes/pflege.js";
 import { scanRouten } from "./routes/scan.js";
 import { stammdatenRouten } from "./routes/stammdaten.js";
+import { logbuchRouten } from "./routes/logbuch.js";
 
 export const app = new Hono<AppEnv>();
 
@@ -250,6 +251,7 @@ app.route("/api", pflegeRouten);
 app.route("/api", austauschRouten);
 app.route("/api", etikettenRouten);
 app.route("/api", benutzerRouten);
+app.route("/api", logbuchRouten);
 
 // Alles unter /api, was keine Route trifft, bekommt JSON statt der
 // HTML-Auslieferung weiter unten — sonst versucht das Frontend, eine

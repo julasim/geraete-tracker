@@ -110,6 +110,7 @@ export default tseslint.config(
         ImageData: "readonly",
         createImageBitmap: "readonly",
         OffscreenCanvas: "readonly",
+        URLSearchParams: "readonly",
       },
     },
     rules: {

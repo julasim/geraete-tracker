@@ -20,6 +20,7 @@ import {
 } from "../../data/austausch.js";
 import { logInfo } from "../../logger.js";
 import { entpackePaket, bilderZusammenfassung, bauePaket } from "../../domain/paket.js";
+import { protokolliere } from "../../data/logbuch.js";
 
 export const austauschRouten = new Hono<AppEnv>();
 
@@ -116,6 +117,7 @@ austauschRouten.post("/import/geraete", darf("daten.austauschen"), async (c) => 
   const geschrieben = await schreibeImport(ergebnis, benutzer.id);
   logInfo("Import ausgeführt", { benutzer: benutzer.benutzername, ...geschrieben });
 
+  await protokolliere({ benutzer_id: benutzer.id, aktion: "geraete_importiert", bereich: "import", details: geschrieben as unknown as Record<string, unknown> });
   return c.json(geschrieben);
 });
 
@@ -241,5 +243,6 @@ austauschRouten.post("/import/paket", darf("daten.austauschen"), async (c) => {
     });
   }
 
+  await protokolliere({ benutzer_id: benutzer.id, aktion: "paket_importiert", bereich: "import", details: { ...geschrieben, bilder: bilderErgebnis } });
   return c.json({ ...geschrieben, bilder: bilderErgebnis });
 });

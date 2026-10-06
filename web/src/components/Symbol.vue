@@ -132,5 +132,10 @@ defineProps<{ name: SymbolName; groesse?: number }>();
       <rect x="9" y="3" width="6" height="13" rx="1" />
       <rect x="16" y="3" width="6" height="16" rx="1" />
     </template>
+    <template v-else-if="name === 'logbuch'">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+      <path d="M14 2v6h6" />
+      <path d="M16 13H8M16 17H8M10 9H8" />
+    </template>
   </svg>
 </template>

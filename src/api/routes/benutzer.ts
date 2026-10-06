@@ -27,6 +27,7 @@ import {
 import { RECHT_TEXT, rechteNachGruppe, RECHTE } from "../../domain/rechte.js";
 import { letzteSicherung } from "../../data/sicherung.js";
 import { logInfo } from "../../logger.js";
+import { protokolliere } from "../../data/logbuch.js";
 
 export const benutzerRouten = new Hono<AppEnv>();
 
@@ -81,6 +82,7 @@ benutzerRouten.post("/benutzer", darf("benutzer.verwalten"), async (c) => {
   // Das Einmalpasswort wird GENAU HIER einmal ausgeliefert und nirgends
   // gespeichert. Wer es verliert, setzt es neu — das ist billiger als ein
   // Passwort, das irgendwo im Klartext herumliegt.
+  await protokolliere({ benutzer_id: akteur.id, aktion: "angelegt", bereich: "benutzer", ziel_id: benutzer.id, ziel_text: benutzer.benutzername });
   return c.json({ benutzer, einmalpasswort }, 201);
 });
 
@@ -95,13 +97,16 @@ benutzerRouten.patch("/benutzer/:id", darf("benutzer.verwalten"), async (c) => {
     }),
   );
   const akteur = angemeldet(c);
-  return c.json(await aendereBenutzer(pfadId(c), daten, akteur.id));
+  const ergebnis = await aendereBenutzer(pfadId(c), daten, akteur.id);
+  await protokolliere({ benutzer_id: akteur.id, aktion: "geaendert", bereich: "benutzer", ziel_id: pfadId(c), details: daten });
+  return c.json(ergebnis);
 });
 
 benutzerRouten.post("/benutzer/:id/passwort", darf("benutzer.verwalten"), async (c) => {
   const akteur = angemeldet(c);
   const ergebnis = await setzePasswortZurueck(pfadId(c), akteur.id);
   logInfo("Passwort zurückgesetzt", { von: akteur.benutzername, konto: pfadId(c) });
+  await protokolliere({ benutzer_id: akteur.id, aktion: "passwort_zurueckgesetzt", bereich: "benutzer", ziel_id: pfadId(c) });
   return c.json(ergebnis);
 });
 
@@ -143,7 +148,10 @@ benutzerRouten.post("/rollen", darf("benutzer.verwalten"), async (c) => {
       rechte: z.array(z.string()).default([]),
     }),
   );
-  return c.json(await legeRolleAn(daten), 201);
+  const akteur = angemeldet(c);
+  const rolle = await legeRolleAn(daten);
+  await protokolliere({ benutzer_id: akteur.id, aktion: "angelegt", bereich: "rolle", ziel_text: daten.id });
+  return c.json(rolle, 201);
 });
 
 benutzerRouten.patch("/rollen/:id", darf("benutzer.verwalten"), async (c) => {
@@ -158,12 +166,17 @@ benutzerRouten.patch("/rollen/:id", darf("benutzer.verwalten"), async (c) => {
   // Kein pfadId(): Rollen-Kennungen sind Text, keine UUID.
   const id = c.req.param("id");
   if (!id) throw new EingabeFehler("Die Rollen-Kennung fehlt.");
-  return c.json(await aendereRolle(id, daten));
+  const akteur = angemeldet(c);
+  const ergebnis = await aendereRolle(id, daten);
+  await protokolliere({ benutzer_id: akteur.id, aktion: "geaendert", bereich: "rolle", ziel_text: id });
+  return c.json(ergebnis);
 });
 
 benutzerRouten.delete("/rollen/:id", darf("benutzer.verwalten"), async (c) => {
   const id = c.req.param("id");
   if (!id) throw new EingabeFehler("Die Rollen-Kennung fehlt.");
+  const akteur = angemeldet(c);
   await loescheRolle(id);
+  await protokolliere({ benutzer_id: akteur.id, aktion: "geloescht", bereich: "rolle", ziel_text: id });
   return c.json({ ok: true });
 });

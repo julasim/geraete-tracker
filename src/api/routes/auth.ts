@@ -39,6 +39,7 @@ import {
 } from "../auth.js";
 import { ipUeberlastet, klientIp, pruefeSperre, warte, warteZeitMs } from "../bremse.js";
 import { EingabeFehler } from "../fehler.js";
+import { protokolliere } from "../../data/logbuch.js";
 
 export const authRouten = new Hono<AppEnv>();
 
@@ -147,6 +148,7 @@ authRouten.post("/auth/login", async (c) => {
   setzeSitzungsCookie(c, stelleTokenAus(konto));
   logInfo("Anmeldung erfolgreich", { benutzer: konto.benutzername, ip });
 
+  await protokolliere({ benutzer_id: konto.id, aktion: "angemeldet", bereich: "auth", ziel_text: konto.benutzername });
   return c.json({
     benutzer: oeffentlich(konto),
     rechte: await rechteVonRolle(konto.rolle),
@@ -154,7 +156,9 @@ authRouten.post("/auth/login", async (c) => {
   });
 });
 
-authRouten.post("/auth/logout", anmeldungPruefen, (c) => {
+authRouten.post("/auth/logout", anmeldungPruefen, async (c) => {
+  const benutzer = angemeldet(c);
+  await protokolliere({ benutzer_id: benutzer.id, aktion: "abgemeldet", bereich: "auth" });
   loescheSitzungsCookie(c);
   return c.json({ ok: true });
 });
@@ -223,6 +227,7 @@ authRouten.post("/auth/passwort", anmeldungPruefen, async (c) => {
   setzeSitzungsCookie(c, stelleTokenAus({ ...benutzer, token_version: benutzer.token_version + 1 }));
   logInfo("Passwort geändert", { benutzer: benutzer.benutzername });
 
+  await protokolliere({ benutzer_id: benutzer.id, aktion: "passwort_geaendert", bereich: "auth" });
   return c.json({ ok: true, hinweis: "Andere Geräte wurden abgemeldet." });
 });
 

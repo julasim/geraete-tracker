@@ -26,6 +26,8 @@ import {
 } from "../../data/stammdaten.js";
 import { EingabeFehler } from "../fehler.js";
 import { pfadId } from "../pfad.js";
+import { protokolliere } from "../../data/logbuch.js";
+import { angemeldet } from "../auth.js";
 
 export const stammdatenRouten = new Hono<AppEnv>();
 
@@ -54,7 +56,10 @@ const schlagwortSchema = z.object({
 
 stammdatenRouten.post("/schlagworte", darf("stammdaten.pflegen"), async (c) => {
   const daten = await gelesen(c, schlagwortSchema);
-  return c.json(await legeSchlagwortAn(daten), 201);
+  const ergebnis = await legeSchlagwortAn(daten);
+  const akteur = angemeldet(c);
+  await protokolliere({ benutzer_id: akteur.id, aktion: "angelegt", bereich: "schlagwort", ziel_id: ergebnis.id, ziel_text: ergebnis.name });
+  return c.json(ergebnis, 201);
 });
 
 stammdatenRouten.patch("/schlagworte/:id", darf("stammdaten.pflegen"), async (c) => {
@@ -62,11 +67,17 @@ stammdatenRouten.patch("/schlagworte/:id", darf("stammdaten.pflegen"), async (c)
     c,
     schlagwortSchema.partial().extend({ sort_order: z.number().int().optional() }),
   );
-  return c.json(await aendereSchlagwort(pfadId(c), daten));
+  const ergebnis = await aendereSchlagwort(pfadId(c), daten);
+  const akteur = angemeldet(c);
+  await protokolliere({ benutzer_id: akteur.id, aktion: "geaendert", bereich: "schlagwort", ziel_id: ergebnis.id, ziel_text: ergebnis.name });
+  return c.json(ergebnis);
 });
 
 stammdatenRouten.delete("/schlagworte/:id", darf("stammdaten.pflegen"), async (c) => {
-  await loescheSchlagwort(pfadId(c));
+  const id = pfadId(c);
+  await loescheSchlagwort(id);
+  const akteur = angemeldet(c);
+  await protokolliere({ benutzer_id: akteur.id, aktion: "geloescht", bereich: "schlagwort", ziel_id: id });
   return c.json({ ok: true });
 });
 
@@ -94,12 +105,18 @@ const standortSchema = z.object({
 
 stammdatenRouten.post("/standorte", darf("stammdaten.pflegen"), async (c) => {
   const daten = await gelesen(c, standortSchema);
-  return c.json(await legeStandortAn(daten), 201);
+  const ergebnis = await legeStandortAn(daten);
+  const akteur = angemeldet(c);
+  await protokolliere({ benutzer_id: akteur.id, aktion: "angelegt", bereich: "standort", ziel_id: ergebnis.id, ziel_text: ergebnis.name });
+  return c.json(ergebnis, 201);
 });
 
 stammdatenRouten.patch("/standorte/:id", darf("stammdaten.pflegen"), async (c) => {
   const daten = await gelesen(c, standortSchema.partial().extend({ aktiv: z.boolean().optional() }));
-  return c.json(await aendereStandort(pfadId(c), daten));
+  const ergebnis = await aendereStandort(pfadId(c), daten);
+  const akteur = angemeldet(c);
+  await protokolliere({ benutzer_id: akteur.id, aktion: "geaendert", bereich: "standort", ziel_id: ergebnis.id, ziel_text: ergebnis.name });
+  return c.json(ergebnis);
 });
 
 // ── Lagerplätze ────────────────────────────────────────────────────────────
@@ -129,7 +146,10 @@ const lagerplatzSchema = z.object({
 
 stammdatenRouten.post("/lagerplaetze", darf("stammdaten.pflegen"), async (c) => {
   const daten = await gelesen(c, lagerplatzSchema);
-  return c.json(await legeLagerplatzAn(daten), 201);
+  const ergebnis = await legeLagerplatzAn(daten);
+  const akteur = angemeldet(c);
+  await protokolliere({ benutzer_id: akteur.id, aktion: "angelegt", bereich: "lagerplatz", ziel_id: ergebnis.id, ziel_text: ergebnis.bezeichnung });
+  return c.json(ergebnis, 201);
 });
 
 stammdatenRouten.patch("/lagerplaetze/:id", darf("stammdaten.pflegen"), async (c) => {
@@ -142,5 +162,8 @@ stammdatenRouten.patch("/lagerplaetze/:id", darf("stammdaten.pflegen"), async (c
       aktiv: z.boolean().optional(),
     }),
   );
-  return c.json(await aendereLagerplatz(pfadId(c), daten));
+  const ergebnis = await aendereLagerplatz(pfadId(c), daten);
+  const akteur = angemeldet(c);
+  await protokolliere({ benutzer_id: akteur.id, aktion: "geaendert", bereich: "lagerplatz", ziel_id: ergebnis.id, ziel_text: ergebnis.bezeichnung });
+  return c.json(ergebnis);
 });

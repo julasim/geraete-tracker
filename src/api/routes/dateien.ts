@@ -19,6 +19,7 @@ import {
   speichereDatei,
 } from "../../data/dateien.js";
 import { leseDatei, leseThumbnail, nimmDateiAn } from "../upload.js";
+import { protokolliere } from "../../data/logbuch.js";
 
 export const dateiRouten = new Hono<AppEnv>();
 
@@ -49,22 +50,21 @@ dateiRouten.post("/geraete/:id/dateien", darf("dateien.hochladen"), async (c) =>
   const buchungId = formular.get("buchung_id");
   const titel = formular.get("titel");
 
-  return c.json(
-    await speichereDatei({
-      geraet_id: geraetId,
-      schaden_id: typeof schadenId === "string" && schadenId ? schadenId : null,
-      buchung_id: typeof buchungId === "string" && buchungId ? buchungId : null,
-      art: gespeichert.art,
-      // Der Name dient nur der Anzeige — abgelegt wird unter einer UUID.
-      dateiname: (datei.name || "Datei").slice(0, 200),
-      pfad: gespeichert.pfad,
-      mime: gespeichert.mime,
-      groesse: gespeichert.groesse,
-      titel: typeof titel === "string" && titel ? titel.slice(0, 200) : null,
-      hochgeladen_von: benutzer.id,
-    }),
-    201,
-  );
+  const ergebnis = await speichereDatei({
+    geraet_id: geraetId,
+    schaden_id: typeof schadenId === "string" && schadenId ? schadenId : null,
+    buchung_id: typeof buchungId === "string" && buchungId ? buchungId : null,
+    art: gespeichert.art,
+    // Der Name dient nur der Anzeige — abgelegt wird unter einer UUID.
+    dateiname: (datei.name || "Datei").slice(0, 200),
+    pfad: gespeichert.pfad,
+    mime: gespeichert.mime,
+    groesse: gespeichert.groesse,
+    titel: typeof titel === "string" && titel ? titel.slice(0, 200) : null,
+    hochgeladen_von: benutzer.id,
+  });
+  await protokolliere({ benutzer_id: benutzer.id, aktion: "hochgeladen", bereich: "datei", ziel_id: geraetId, ziel_text: datei.name });
+  return c.json(ergebnis, 201);
 });
 
 /**
@@ -115,11 +115,15 @@ dateiRouten.get("/dateien/:id/thumb", async (c) => {
 
 dateiRouten.post("/dateien/:id/titelbild", darf("dateien.verwalten"), async (c) => {
   const id = pfadId(c);
+  const akteur = angemeldet(c);
   await setzeTitelbild(id);
+  await protokolliere({ benutzer_id: akteur.id, aktion: "titelbild_gesetzt", bereich: "datei", ziel_id: pfadId(c) });
   return c.json({ ok: true });
 });
 
 dateiRouten.delete("/dateien/:id", darf("dateien.verwalten"), async (c) => {
+  const akteur = angemeldet(c);
   await entferneDatei(pfadId(c));
+  await protokolliere({ benutzer_id: akteur.id, aktion: "geloescht", bereich: "datei", ziel_id: pfadId(c) });
   return c.json({ ok: true });
 });
